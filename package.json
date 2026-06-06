@@ -1,0 +1,20 @@
+{
+  "name": "memdecks-games-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SDK + contracts for building single- and multiplayer games on the memdecks platform.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "examples/*",
+    "templates/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @memdecks/mp-types && npm run build -w @memdecks/mp-runtime && npm run build -w @memdecks/mp-client",
+    "clean": "node -e \"require('fs').rmSync('packages',{recursive:true,force:true,filter:p=>p.endsWith('dist')})\" || true"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.3",
+    "typescript": "^5.3.3"
+  }
+}

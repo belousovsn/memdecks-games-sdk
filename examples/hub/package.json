@@ -1,0 +1,19 @@
+{
+  "name": "@memdecks/example-hub",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reference first-party hub: runs several GameModules in one mp-runtime process, routed by gameId.",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@memdecks/example-speed-match": "*",
+    "@memdecks/mp-runtime": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@memdecks/template-single-player-game",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Starter template for a memdecks single-player game (client-only, no server).",
+  "license": "MIT",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@memdecks/mp-client": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

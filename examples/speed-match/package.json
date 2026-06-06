@@ -1,0 +1,23 @@
+{
+  "name": "@memdecks/example-speed-match",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reference multiplayer game on the memdecks SDK: race to match the foreign word to its English card.",
+  "license": "MIT",
+  "main": "dist/module.js",
+  "exports": {
+    ".": "./dist/module.js",
+    "./server": "./dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@memdecks/mp-runtime": "*",
+    "@memdecks/mp-types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

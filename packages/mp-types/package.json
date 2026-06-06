@@ -1,0 +1,17 @@
+{
+  "name": "@memdecks/mp-types",
+  "version": "0.0.1",
+  "description": "Zero-dependency shared contracts for the memdecks game platform: bridge messages, Card model, GameModule, match tickets, and the gameplay socket protocol.",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

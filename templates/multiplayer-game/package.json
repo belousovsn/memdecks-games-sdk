@@ -1,0 +1,19 @@
+{
+  "name": "@memdecks/template-multiplayer-game",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Starter template for a memdecks multiplayer game. Copy this folder, rename, implement the GameModule.",
+  "license": "MIT",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@memdecks/mp-runtime": "*",
+    "@memdecks/mp-types": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
