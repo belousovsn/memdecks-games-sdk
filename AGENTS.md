@@ -18,6 +18,8 @@ transport, lobby, auth, card provisioning, and broadcasting.
   - `manifest` — `id`, `title`, `minPlayers`/`maxPlayers` (set `minPlayers: 1` to allow
     solo), optional `roles`, `settingsSchema`, `requiresCards`.
   - `createMatch(ctx)` — build initial `State` from roster + settings + per-player `cards`.
+    May be **async** (`State | Promise<State>`) — e.g. to `await ctx.translate(...)`. The
+    runtime holds the match in a waiting state until the promise settles.
   - `applyAction(state, playerId, action)` — handle a discrete action. `playerId` is the
     player's **userId** (stable across reconnects), never a socket id.
   - `tick?(state)` + `nextDelayMs?(state)` — optional real-time loop: `tick` advances
@@ -32,6 +34,7 @@ transport, lobby, auth, card provisioning, and broadcasting.
 - **Gameplay protocol** — `MP_EVENTS` + payloads. Use the standardized `mp:action`
   channel, not custom event names.
 - **Cards** — `Card`, `CardTranslation`, `LanguageCode`.
+- **Translation** — `TranslateFn` (`ctx.translate`); see *Cross-language play* below.
 
 ## Rules of the road
 
@@ -42,6 +45,36 @@ transport, lobby, auth, card provisioning, and broadcasting.
    and use `channelsFor` for hidden info.
 4. Keep `State` authoritative on the server; clients only render `viewFor` output and
    send actions.
+
+## Cross-language play (`ctx.translate`)
+
+Players study different languages, so two people in one match may know the same card
+under different words. `ctx.translate` lets a game localize **just the cards it picked**
+at match setup — platform-backed and lookup-only, so no admin key lives in the game.
+
+`MatchedPlayer.language` (e.g. `"gr"`) tells you each player's study language. From an
+**async** `createMatch`, look up the words you need in the languages you need:
+
+```ts
+async createMatch(ctx: MatchContext): Promise<State> {
+  const langs = [...new Set(ctx.players.map((p) => p.language).filter(Boolean))];
+  const words = pickWords(ctx.cards);            // the English words this match uses
+
+  // translate?: present only when the runtime has a provider configured.
+  const t = ctx.translate ? await ctx.translate(words, langs as string[]) : {};
+
+  // t[word][lang] is a CardTranslation, or null when the platform has none.
+  const labelFor = (word: string, lang?: string) =>
+    (lang && t[word]?.[lang]?.text) || word;     // fall back to English
+
+  return buildState(ctx, labelFor);
+}
+```
+
+Notes:
+- `ctx.translate` is **absent** when the runtime has no translate provider — always guard.
+- It returns `null` per word/language the platform can't translate; fall back to English.
+- Call it **once** in `createMatch` for the words you actually use; it is not a per-frame API.
 
 ## Client quickstart (`@memdecks/mp-client`)
 

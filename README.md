@@ -14,7 +14,7 @@ postMessage bridge, and (for multiplayer) run their realtime session on an
 | Package | Role | Status |
 |---|---|---|
 | [`@memdecks/mp-types`](packages/mp-types) | Zero-dep contracts: bridge messages, `Card`, `GameModule`, match tickets, gameplay protocol | ✅ implemented |
-| [`@memdecks/mp-runtime`](packages/mp-runtime) | Tier-2 game session engine (Socket.IO, lobby/match lifecycle, ticket verify, per-player views, card provisioning) | ✅ implemented |
+| [`@memdecks/mp-runtime`](packages/mp-runtime) | Tier-2 game session engine (Socket.IO, lobby/match lifecycle, ticket verify, per-player views, card provisioning, word translation) | ✅ implemented |
 | [`@memdecks/mp-client`](packages/mp-client) | Game-side helper: bridge receiver + authenticated socket + join-by-ticket + single-player card fetch | ✅ implemented |
 
 ## Mental model
@@ -28,6 +28,9 @@ postMessage bridge, and (for multiplayer) run their realtime session on an
   to the platform.
 - **A game author writes one thing:** a `GameModule` (rules) + a thin client. Everything
   else — lobby, transport, auth, cards — comes from the SDK.
+- **Cross-language play:** players study different languages. From an async `createMatch`,
+  call `ctx.translate(words, languages)` to localize the cards a match picked — see
+  [AGENTS.md](AGENTS.md#cross-language-play-ctxtranslate).
 
 See [AGENTS.md](AGENTS.md) for the contract summary aimed at LLM coding agents.
 
