@@ -62,6 +62,10 @@ export function createMultiplayerServer(
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", games: [...modules.keys()] });
   });
+  // Manifests for the platform lobby to import (settingsSchema, player counts, roles).
+  app.get("/manifest", (_req, res) => {
+    res.json([...modules.values()].map((m) => m.manifest));
+  });
 
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {

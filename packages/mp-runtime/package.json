@@ -1,6 +1,6 @@
 {
   "name": "@memdecks/mp-runtime",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "description": "Tier-2 game session engine for the memdecks platform: Socket.IO transport, match-ticket verification, room/match lifecycle, per-player views, and card provisioning. Run a single GameModule (standalone) or many (hub).",
   "license": "MIT",
   "main": "dist/index.js",
@@ -9,10 +9,11 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@memdecks/mp-types": "*",
+    "@memdecks/mp-types": "^0.1.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "jose": "^5.2.0",
