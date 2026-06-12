@@ -17,6 +17,8 @@ export interface MatchedPlayer {
   seat: number;
   /** Assigned role, for games that declare `manifest.roles`. */
   role?: string;
+  /** Study language from the player's account settings (e.g. "gr"), when known. */
+  language?: string;
 }
 
 /**

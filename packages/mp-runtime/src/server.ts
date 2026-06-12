@@ -16,6 +16,7 @@ import {
 import { loadEnv, type RuntimeEnv } from "./env";
 import { createTicketVerifier } from "./auth";
 import { defaultCardProvider, type CardProvider } from "./cards";
+import { defaultTranslateProvider, type TranslateProvider } from "./translate";
 import { Room } from "./room";
 
 export interface MultiplayerServerOptions {
@@ -27,6 +28,8 @@ export interface MultiplayerServerOptions {
   env?: Partial<RuntimeEnv>;
   /** Custom card provider; defaults to GET {apiBase}/api/cards with the scoped token. */
   cardProvider?: CardProvider;
+  /** Custom `ctx.translate` provider; defaults to POST {apiBase}/api/cards/translate. */
+  translateProvider?: TranslateProvider;
 }
 
 export interface MultiplayerServerHandle {
@@ -55,6 +58,7 @@ export function createMultiplayerServer(
 
   const verify = createTicketVerifier(env);
   const cardProvider = opts.cardProvider ?? defaultCardProvider;
+  const translateProvider = opts.translateProvider ?? defaultTranslateProvider;
 
   const app = express();
   app.use(cors({ origin: env.clientOrigins }));
@@ -94,7 +98,12 @@ export function createMultiplayerServer(
 
         let room = rooms.get(claims.matchId);
         if (!room) {
-          room = new Room(io, module, claims);
+          // Any rostered player's scoped token can authorize the match's translate calls.
+          const translate = translateProvider({
+            cardToken: claims.cardToken,
+            apiBase: env.translatorApiBase,
+          });
+          room = new Room(io, module, claims, translate);
           rooms.set(claims.matchId, room);
         }
 
