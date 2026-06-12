@@ -1,6 +1,6 @@
 {
   "name": "@memdecks/mp-types",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Zero-dependency shared contracts for the memdecks game platform: bridge messages, Card model, GameModule, match tickets, and the gameplay socket protocol.",
   "license": "MIT",
   "main": "dist/index.js",
