@@ -11,6 +11,7 @@ import {
   type MatchTicketClaims,
   type MatchedPlayer,
   type MpActionPayload,
+  type TranslateFn,
 } from "@memdecks/mp-types";
 
 interface Seat {
@@ -26,18 +27,25 @@ export class Room<State = unknown, Action = unknown> {
   private readonly io: Server;
   private readonly module: GameModule<State, Action>;
   private readonly settings: Record<string, unknown>;
+  private readonly translate: TranslateFn | undefined;
   private readonly seats = new Map<string, Seat>();
   private state: State | undefined;
   private started = false;
   private over = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(io: Server, module: GameModule<State, Action>, claims: MatchTicketClaims) {
+  constructor(
+    io: Server,
+    module: GameModule<State, Action>,
+    claims: MatchTicketClaims,
+    translate?: TranslateFn,
+  ) {
     this.io = io;
     this.module = module;
     this.matchId = claims.matchId;
     this.gameId = claims.gameId;
     this.settings = claims.settings ?? {};
+    this.translate = translate;
     for (const player of claims.players) {
       this.seats.set(player.userId, { player, present: false });
     }
@@ -107,14 +115,28 @@ export class Room<State = unknown, Action = unknown> {
     const cards: Record<string, Card[]> = {};
     for (const [userId, seat] of this.seats) cards[userId] = seat.cards ?? [];
 
-    this.state = this.module.createMatch({
-      matchId: this.matchId,
-      players,
-      settings: this.settings,
-      cards,
-    });
+    // Guard re-entry before awaiting: a second join while createMatch is in flight
+    // must not start the match twice.
     this.started = true;
-    this.afterMutation();
+    Promise.resolve(
+      this.module.createMatch({
+        matchId: this.matchId,
+        players,
+        settings: this.settings,
+        cards,
+        ...(this.translate ? { translate: this.translate } : {}),
+      }),
+    )
+      .then((state) => {
+        this.state = state;
+        this.afterMutation();
+      })
+      .catch((err: unknown) => {
+        this.started = false;
+        this.io.to(this.matchId).emit(MP_EVENTS.error, {
+          message: `Match setup failed: ${(err as Error)?.message ?? String(err)}`,
+        });
+      });
   }
 
   /** Broadcast + over-check + timer re-arm. Call after start, each action, each tick. */

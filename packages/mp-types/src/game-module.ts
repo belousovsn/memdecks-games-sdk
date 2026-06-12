@@ -5,7 +5,7 @@
  * `playerId` throughout is the stable per-match player id (the player's userId),
  * not a socket id — so it survives reconnects.
  */
-import type { Card } from "./cards";
+import type { Card, CardTranslation } from "./cards";
 import type { MatchedPlayer } from "./match";
 
 /** A dropdown setting the platform lobby renders generically. */
@@ -76,6 +76,18 @@ export interface RatingDelta {
   delta: number;
 }
 
+/**
+ * Translate English words into target study languages (platform-backed, lookup-only).
+ * Returns, per word, the translation in each requested language — or `null` where the
+ * platform has no stored translation. Games call this from `createMatch` to localize
+ * just the cards they actually picked (e.g. showing one player's card to a co-player
+ * who studies a different language).
+ */
+export type TranslateFn = (
+  words: string[],
+  languages: string[],
+) => Promise<Record<string, Partial<Record<string, CardTranslation | null>>>>;
+
 /** Inputs handed to `createMatch` when a match (incl. solo) is formed. */
 export interface MatchContext {
   matchId: string;
@@ -85,6 +97,8 @@ export interface MatchContext {
   settings: Record<string, unknown>;
   /** Each player's resolved cards, keyed by userId. */
   cards: Record<string, Card[]>;
+  /** Platform-backed word translation; absent when the runtime has no provider. */
+  translate?: TranslateFn;
 }
 
 /**
@@ -96,8 +110,12 @@ export interface MatchContext {
 export interface GameModule<State = unknown, Action = unknown> {
   manifest: GameManifest;
 
-  /** Build authoritative initial state for a formed match (solo = 1 player). */
-  createMatch(ctx: MatchContext): State;
+  /**
+   * Build authoritative initial state for a formed match (solo = 1 player).
+   * May be async — e.g. to call `ctx.translate` for the cards it picked. The runtime
+   * holds the match in a waiting state until the promise settles.
+   */
+  createMatch(ctx: MatchContext): State | Promise<State>;
 
   /** Apply a discrete player action (the standardized `mp:action` channel). */
   applyAction(state: State, playerId: string, action: Action): void;
