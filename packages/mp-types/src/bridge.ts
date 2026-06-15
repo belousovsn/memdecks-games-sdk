@@ -17,7 +17,10 @@ export interface ResolvedCardRef {
 export type GameToParentMessage =
   | { type: "game:ready" }
   | { type: "game:close" }
-  | { type: "game:result"; result: GameResult };
+  | { type: "game:result"; result: GameResult }
+  /** Ask the host to start another round with the same group (the game's own
+   *  "Play again / Continue" button). The host re-opens its rematch flow. */
+  | { type: "game:rematch" };
 
 /** The init payload the parent sends DOWN once the game signals `game:ready`. */
 export interface TranslatorInitMessage {

@@ -45,6 +45,10 @@ export interface TranslatorBridge {
   close(): void;
   /** Send a result up to the host. */
   reportResult(result: GameResult): void;
+  /** Ask the host to start another round with the same group (a "Play again"
+   *  button). The host re-opens its rematch flow; a fresh match is signed and
+   *  the game iframe is reloaded with the new ticket. No-op when standalone. */
+  rematch(): void;
 }
 
 function toSession(init: TranslatorInitMessage): GameSession {
@@ -64,6 +68,7 @@ export async function initGame(options: InitOptions = {}): Promise<TranslatorBri
     session: null,
     close() {},
     reportResult() {},
+    rematch() {},
   };
   if (typeof window === "undefined") return noop;
 
@@ -122,6 +127,9 @@ export async function initGame(options: InitOptions = {}): Promise<TranslatorBri
     },
     reportResult(result: GameResult) {
       post({ type: "game:result", result });
+    },
+    rematch() {
+      post({ type: "game:rematch" });
     },
   };
 }
