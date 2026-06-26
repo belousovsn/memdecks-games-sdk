@@ -5,12 +5,13 @@
  * keeps handling `translator:token_refresh`, and exposes `close()` / `reportResult()`.
  * Works standalone too (no host): resolves with `session: null` after a short timeout.
  */
-import type {
-  GameResult,
-  MatchHandoff,
-  ResolvedCardRef,
-  TranslatorInitMessage,
-  TranslatorTokenRefreshMessage,
+import {
+  PROTOCOL_VERSION,
+  type GameResult,
+  type MatchHandoff,
+  type ResolvedCardRef,
+  type TranslatorInitMessage,
+  type TranslatorTokenRefreshMessage,
 } from "@memdecks/mp-types";
 
 /** Resolved identity + handoff the host handed down. */
@@ -83,7 +84,15 @@ export async function initGame(options: InitOptions = {}): Promise<TranslatorBri
     const data = event.data as { type?: string } | null;
     if (!data || typeof data !== "object") return;
     if (data.type === "translator:init") {
-      session = toSession(data as TranslatorInitMessage);
+      const init = data as TranslatorInitMessage;
+      if (init.protocolVersion != null && init.protocolVersion !== PROTOCOL_VERSION) {
+        // Host and game disagree on the wire contract's major version. We still proceed
+        // (best effort), but warn loudly — see AGENTS.md "Evolving the contract".
+        console.warn(
+          `[mp-client] protocol mismatch: host v${init.protocolVersion}, game v${PROTOCOL_VERSION}`,
+        );
+      }
+      session = toSession(init);
       if (!settled) {
         settled = true;
         resolveSession(session);
@@ -110,7 +119,7 @@ export async function initGame(options: InitOptions = {}): Promise<TranslatorBri
   // The message listener stays attached for the lifetime of the game so
   // token_refresh keeps working after init resolves.
   window.addEventListener("message", onMessage);
-  post({ type: "game:ready" });
+  post({ type: "game:ready", protocolVersion: PROTOCOL_VERSION });
   window.setTimeout(() => {
     if (!settled) {
       settled = true;

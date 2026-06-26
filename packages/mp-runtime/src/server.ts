@@ -9,6 +9,7 @@ import express from "express";
 import { Server } from "socket.io";
 import {
   MP_EVENTS,
+  PROTOCOL_VERSION,
   type GameModule,
   type MpActionPayload,
   type MpJoinPayload,
@@ -82,6 +83,14 @@ export function createMultiplayerServer(
     socket.on(MP_EVENTS.join, async (payload: MpJoinPayload) => {
       try {
         if (!payload?.matchTicket) throw new Error("missing matchTicket");
+        // Reject a client built against a breaking (different major) contract; tolerate an
+        // absent version (older client). See AGENTS.md "Evolving the contract".
+        if (payload.protocolVersion != null && payload.protocolVersion !== PROTOCOL_VERSION) {
+          socket.emit(MP_EVENTS.error, {
+            message: `Incompatible protocol version: game v${payload.protocolVersion}, runtime v${PROTOCOL_VERSION}. Update the game.`,
+          });
+          return;
+        }
         const claims = await verify(payload.matchTicket);
 
         const module = modules.get(claims.gameId);

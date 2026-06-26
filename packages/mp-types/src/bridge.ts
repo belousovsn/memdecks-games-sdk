@@ -15,7 +15,7 @@ export interface ResolvedCardRef {
 
 /** Messages the GAME (iframe) sends UP to the Translator parent. */
 export type GameToParentMessage =
-  | { type: "game:ready" }
+  | { type: "game:ready"; protocolVersion?: number }
   | { type: "game:close" }
   | { type: "game:result"; result: GameResult }
   /** Ask the host to start another round with the same group (the game's own
@@ -25,6 +25,9 @@ export type GameToParentMessage =
 /** The init payload the parent sends DOWN once the game signals `game:ready`. */
 export interface TranslatorInitMessage {
   type: "translator:init";
+  /** The host's PROTOCOL_VERSION. Optional for back-compat; the game may warn on a
+   *  different major. */
+  protocolVersion?: number;
   /** Base URL of the Translator public API (e.g. https://test.memdecks.com). */
   apiBase: string;
   /** Resolved Translator user id, when known. */
