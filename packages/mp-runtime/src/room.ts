@@ -8,6 +8,7 @@ import {
   MP_EVENTS,
   type Card,
   type GameModule,
+  type GameResult,
   type MatchTicketClaims,
   type MatchedPlayer,
   type MpActionPayload,
@@ -32,7 +33,13 @@ export class Room<State = unknown, Action = unknown> {
   private state: State | undefined;
   private started = false;
   private over = false;
+  private result: GameResult | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
+
+  /** True once the match has finished — read by the runtime's match-status endpoint. */
+  hasEnded(): boolean {
+    return this.over;
+  }
 
   constructor(
     io: Server,
@@ -67,6 +74,11 @@ export class Room<State = unknown, Action = unknown> {
     if (this.started) {
       // Reconnect: send the current view immediately.
       this.emitTo(seat);
+      // If the match already ended while this player was away, re-announce the result so a
+      // resuming/reconnecting client shows its game-over screen instead of a stale board.
+      if (this.over && this.result) {
+        this.io.to(socketId).emit(MP_EVENTS.over, { result: this.result });
+      }
       return;
     }
     if (this.allReady()) this.start();
@@ -147,6 +159,7 @@ export class Room<State = unknown, Action = unknown> {
     const result = this.module.isOver(this.state);
     if (result && !this.over) {
       this.over = true;
+      this.result = result; // retain so a late reconnect can be re-shown the outcome
       if (this.timer) clearTimeout(this.timer);
       this.timer = undefined;
       this.io.to(this.matchId).emit(MP_EVENTS.over, { result });

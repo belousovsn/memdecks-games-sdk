@@ -1,6 +1,7 @@
 // Ad-hoc smoke test for @memdecks/mp-runtime (not part of the package).
 // Boots the runtime with an HS256 ticket + a trivial solo GameModule, joins over a
 // socket, and asserts a match forms and a per-player view is broadcast.
+import http from "node:http";
 import { createMultiplayerServer } from "./packages/mp-runtime/dist/index.js";
 import { SignJWT } from "jose";
 import { io } from "socket.io-client";
@@ -30,8 +31,9 @@ const gameModule = {
   viewFor(state) {
     return state;
   },
-  isOver() {
-    return null;
+  isOver(state) {
+    // Stays live until the first action, then ends — lets the smoke exercise over + status.
+    return state.moves >= 1 ? { ended: true } : null;
   },
 };
 
@@ -76,12 +78,53 @@ const state = await new Promise((resolve, reject) => {
 });
 
 let ok = true;
+let socket2;
+// node:http with agent:false (no keep-alive) so the process exits cleanly afterward.
+const status = () =>
+  new Promise((resolve, reject) => {
+    const req = http.get(`http://localhost:${PORT}/matches/m1/status`, { agent: false }, (res) => {
+      let body = "";
+      res.on("data", (d) => (body += d));
+      res.on("end", () => { try { resolve(JSON.parse(body)); } catch (e) { reject(e); } });
+    });
+    req.on("error", reject);
+  });
 try {
   if (state.cardCount !== 1) { ok = false; console.error("FAIL: expected cardCount 1, got", state.cardCount); }
   if (!state.players || state.players[0] !== "u1") { ok = false; console.error("FAIL: roster wrong", state.players); }
-  if (ok) console.log("SMOKE OK — match formed, view broadcast:", JSON.stringify(state));
+
+  // Liveness/status: the match exists and is still running.
+  const s1 = await status();
+  if (!s1.exists || s1.over) { ok = false; console.error("FAIL: status before over", JSON.stringify(s1)); }
+
+  // End the match (one action triggers isOver) and confirm mp:over.
+  const overP = new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("no mp:over")), 4000);
+    socket.on("mp:over", (o) => { clearTimeout(t); resolve(o); });
+  });
+  socket.emit("mp:action", { action: "go" });
+  await overP;
+
+  // Status now reports over.
+  const s2 = await status();
+  if (!s2.exists || !s2.over) { ok = false; console.error("FAIL: status after over", JSON.stringify(s2)); }
+
+  // A player reconnecting after the match ended is re-shown the outcome (mp:over on rejoin).
+  socket2 = io(`http://localhost:${PORT}`, { transports: ["websocket"], forceNew: true });
+  const reOver = await new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("no mp:over on rejoin")), 4000);
+    socket2.on("mp:over", (o) => { clearTimeout(t); resolve(o); });
+    socket2.on("connect", () => socket2.emit("mp:join", { matchTicket: ticket }));
+  });
+  if (!reOver?.result?.ended) { ok = false; console.error("FAIL: rejoin over payload", JSON.stringify(reOver)); }
+
+  if (ok) console.log("SMOKE OK — match formed, view broadcast, over + status + resume-over verified");
+} catch (e) {
+  ok = false;
+  console.error("FAIL:", e.message);
 } finally {
   socket.close();
+  if (socket2) socket2.close();
   await handle.close();
   process.exit(ok ? 0 : 1);
 }

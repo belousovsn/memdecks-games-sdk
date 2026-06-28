@@ -79,6 +79,14 @@ export function createMultiplayerServer(
 
   const rooms = new Map<string, Room>();
 
+  // Liveness + match status for the platform: lets the host tell "still running" from
+  // "finished" from "server unreachable" while a player has the game backgrounded. No game
+  // state is exposed. `exists:false` = never started or already disposed (everyone left).
+  app.get("/matches/:matchId/status", (req, res) => {
+    const room = rooms.get(req.params.matchId);
+    res.json({ exists: Boolean(room), over: room?.hasEnded() ?? false });
+  });
+
   io.on("connection", (socket) => {
     socket.on(MP_EVENTS.join, async (payload: MpJoinPayload) => {
       try {
