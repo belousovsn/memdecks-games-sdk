@@ -26,6 +26,9 @@ export const MP_EVENTS = {
   channel: "mp:channel",
   /** server -> client: the match finished. */
   over: "mp:over",
+  /** server -> client: a rostered player's presence changed (left / returned). Lets a
+   *  client show "opponent left" / "reconnecting" without threading it through viewFor. */
+  presence: "mp:presence",
   /** server -> client: an error (bad ticket, not in match, etc.). */
   error: "mp:error",
 } as const;
@@ -52,6 +55,17 @@ export interface MpChannelPayload {
 
 export interface MpOverPayload {
   result: GameResult;
+}
+
+/** server -> client: the roster's current presence, broadcast when a player leaves or
+ *  returns mid-match. */
+export interface MpPresencePayload {
+  players: Array<{
+    userId: string;
+    seat: number;
+    /** False while the player is disconnected (refresh / backgrounded / left). */
+    present: boolean;
+  }>;
 }
 
 export interface MpErrorPayload {

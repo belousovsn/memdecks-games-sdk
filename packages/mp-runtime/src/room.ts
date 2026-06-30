@@ -12,6 +12,7 @@ import {
   type MatchTicketClaims,
   type MatchedPlayer,
   type MpActionPayload,
+  type MpPresencePayload,
   type TranslateFn,
 } from "@memdecks/mp-types";
 import { noopReporter, type LifecycleEventType, type LifecycleReporter } from "./reporter";
@@ -89,7 +90,10 @@ export class Room<State = unknown, Action = unknown> {
       // resuming/reconnecting client shows its game-over screen instead of a stale board.
       if (this.over && this.result) {
         this.io.to(socketId).emit(MP_EVENTS.over, { result: this.result });
+        return;
       }
+      // A live match: let the game react to the player returning, and tell everyone.
+      this.applyPresence(userId, true);
       return;
     }
     if (this.allReady()) this.start();
@@ -103,12 +107,14 @@ export class Room<State = unknown, Action = unknown> {
     this.afterMutation();
   }
 
-  /** Mark a player disconnected; state is retained for reconnection. */
+  /** Mark a player disconnected; state is retained for reconnection. Lets the game react
+   *  (pause / forfeit / "opponent left") and tells the remaining players. */
   disconnect(userId: string): void {
     const seat = this.seats.get(userId);
     if (!seat) return;
     seat.present = false;
     seat.socketId = undefined;
+    this.applyPresence(userId, false);
   }
 
   /** True when no players remain connected — the server may dispose the room. */
@@ -227,6 +233,25 @@ export class Room<State = unknown, Action = unknown> {
       this.module.tick?.(this.state);
       this.afterMutation();
     }, Math.max(0, delay));
+  }
+
+  /** A rostered player left or returned mid-match: let the game react, tell everyone the
+   *  new presence, then re-broadcast + re-check `isOver` (so a forfeit can end the match). */
+  private applyPresence(userId: string, present: boolean): void {
+    if (!this.started || this.over || this.state === undefined) return;
+    this.module.onPresenceChange?.(this.state, userId, present);
+    this.broadcastPresence();
+    this.afterMutation();
+  }
+
+  /** Push the current roster presence to all connected players. */
+  private broadcastPresence(): void {
+    const payload: MpPresencePayload = {
+      players: [...this.seats.values()]
+        .map((s) => ({ userId: s.player.userId, seat: s.player.seat, present: s.present }))
+        .sort((a, b) => a.seat - b.seat),
+    };
+    this.io.to(this.matchId).emit(MP_EVENTS.presence, payload);
   }
 
   private broadcast(): void {

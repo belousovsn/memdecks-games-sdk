@@ -142,6 +142,17 @@ export interface GameModule<State = unknown, Action = unknown> {
    */
   channelsFor?(state: State, playerId: string): Record<string, unknown>;
 
+  /**
+   * Optional: react to a rostered player leaving or returning mid-match. The runtime
+   * calls this when a player's connection drops (`present: false`) or is re-established
+   * (`present: true`) **after the match has started**, then re-broadcasts and re-checks
+   * `isOver` — so a game can pause, forfeit, or surface "opponent left" by mutating
+   * `state` here (e.g. end the match when an opponent abandons). `playerId` is the
+   * stable userId. Without this hook, `isOver` only fires on game state, so a vanished
+   * player can leave the other hanging.
+   */
+  onPresenceChange?(state: State, playerId: string, present: boolean): void;
+
   /** Return a result when the match is over, otherwise `null`. */
   isOver(state: State): GameResult | null;
 

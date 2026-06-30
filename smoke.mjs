@@ -37,11 +37,36 @@ const gameModule = {
   },
 };
 
+// A 2-player game that forfeits when an opponent leaves — exercises onPresenceChange.
+const duoModule = {
+  manifest: {
+    id: "duo-presence",
+    title: "Duo Presence",
+    minPlayers: 2,
+    maxPlayers: 2,
+    settingsSchema: [],
+    requiresCards: { minUsable: 0, perLanguage: false },
+  },
+  createMatch() {
+    return { left: [] };
+  },
+  applyAction() {},
+  onPresenceChange(state, playerId, present) {
+    if (!present) state.left.push(playerId);
+  },
+  viewFor(state) {
+    return state;
+  },
+  isOver(state) {
+    return state.left.length ? { outcome: "opponent_left" } : null;
+  },
+};
+
 // Capture lifecycle pushes instead of POSTing them, to assert launch/result fire.
 const lifecycle = [];
 
 const handle = createMultiplayerServer({
-  game: gameModule,
+  games: [gameModule, duoModule],
   cardProvider: async () => [{ id: "c1", english: "cat", translations: {} }],
   lifecycleReporter: { report: (e) => lifecycle.push(e) },
   env: {
@@ -51,6 +76,26 @@ const handle = createMultiplayerServer({
     translatorApiBase: "http://unused",
   },
 });
+
+// Sign an HS256 match ticket for one player of a duo match.
+const duoTicket = (sub) =>
+  new SignJWT({
+    matchId: "dm1",
+    gameId: "duo-presence",
+    seat: sub === "d1" ? 0 : 1,
+    players: [
+      { userId: "d1", name: "D1", seat: 0 },
+      { userId: "d2", name: "D2", seat: 1 },
+    ],
+    settings: {},
+    cardToken: "ct-" + sub,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuer("memdecks-platform")
+    .setAudience("game:duo-presence")
+    .setSubject(sub)
+    .setExpirationTime("5m")
+    .sign(new TextEncoder().encode(SECRET));
 
 const ticket = await new SignJWT({
   matchId: "m1",
@@ -84,6 +129,7 @@ const state = await new Promise((resolve, reject) => {
 
 let ok = true;
 let socket2;
+let dp1, dp2;
 // node:http with agent:false (no keep-alive) so the process exits cleanly afterward.
 const status = () =>
   new Promise((resolve, reject) => {
@@ -134,13 +180,48 @@ try {
   });
   if (!reOver?.result?.ended) { ok = false; console.error("FAIL: rejoin over payload", JSON.stringify(reOver)); }
 
-  if (ok) console.log("SMOKE OK — match formed, view broadcast, over + status + resume-over + lifecycle push verified");
+  // Presence / opponent-left: a 2-player match starts; when one player drops, the runtime
+  // pushes mp:presence to the other AND the game forfeits via onPresenceChange -> isOver.
+  const [t1, t2] = await Promise.all([duoTicket("d1"), duoTicket("d2")]);
+  dp1 = io(`http://localhost:${PORT}`, { transports: ["websocket"], forceNew: true });
+  dp2 = io(`http://localhost:${PORT}`, { transports: ["websocket"], forceNew: true });
+  const firstState = (sock, ticketJwt) =>
+    new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error("no mp:state for duo")), 4000);
+      sock.on("mp:error", (e) => { clearTimeout(t); reject(new Error("mp:error: " + e.message)); });
+      sock.on("mp:state", (s) => { clearTimeout(t); resolve(s); });
+      sock.on("connect", () => sock.emit("mp:join", { matchTicket: ticketJwt }));
+    });
+  await Promise.all([firstState(dp1, t1), firstState(dp2, t2)]);
+
+  // Watch dp1 for the opponent leaving (presence) and the resulting forfeit (over).
+  const presenceP = new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("no mp:presence")), 4000);
+    dp1.on("mp:presence", (p) => {
+      const d2 = p.players?.find((x) => x.userId === "d2");
+      if (d2 && d2.present === false) { clearTimeout(t); resolve(p); }
+    });
+  });
+  const duoOverP = new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("no mp:over after opponent left")), 4000);
+    dp1.on("mp:over", (o) => { clearTimeout(t); resolve(o); });
+  });
+  dp2.close(); // opponent leaves
+  await presenceP;
+  const duoOver = await duoOverP;
+  if (duoOver?.result?.outcome !== "opponent_left") {
+    ok = false; console.error("FAIL: opponent-left forfeit", JSON.stringify(duoOver));
+  }
+
+  if (ok) console.log("SMOKE OK — match formed, view broadcast, over + status + resume-over + lifecycle push + presence/opponent-left verified");
 } catch (e) {
   ok = false;
   console.error("FAIL:", e.message);
 } finally {
   socket.close();
   if (socket2) socket2.close();
+  if (dp1) dp1.close();
+  if (dp2) dp2.close();
   await handle.close();
   process.exit(ok ? 0 : 1);
 }

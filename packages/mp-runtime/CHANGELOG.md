@@ -3,6 +3,28 @@
 All notable changes to the game session engine are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.5.0 — 2026-06-30
+
+Presence / opponent-left handling (Translator-app#188). Additive — no
+`PROTOCOL_VERSION` change.
+
+### Added
+- **Mid-match presence.** When a rostered player drops or returns after the match has
+  started, the runtime now calls the game's optional `onPresenceChange(state, playerId,
+  present)`, broadcasts the roster's presence as `mp:presence`, and re-checks `isOver`.
+  A game can pause, forfeit, or surface "opponent left" by mutating state in the hook —
+  e.g. ending the match when an opponent abandons, instead of leaving the other player
+  hanging (previously `isOver` only fired on game state).
+
+### Changed
+- Bumped `@memdecks/mp-types` dependency to `^0.4.0` (requires `onPresenceChange` +
+  `MP_EVENTS.presence`).
+
+### Migration
+- No code changes required for existing games. Games that don't implement
+  `onPresenceChange` are unaffected except that clients now also receive `mp:presence`
+  updates (safe to ignore).
+
 ## 0.4.0 — 2026-06-30
 
 Lifecycle reporting to the platform session ledger (Translator-app#177). Additive —
