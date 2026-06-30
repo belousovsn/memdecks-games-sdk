@@ -1,6 +1,6 @@
 {
   "name": "@memdecks/mp-runtime",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Tier-2 game session engine for the memdecks platform: Socket.IO transport, match-ticket verification, room/match lifecycle, per-player views, and card provisioning. Run a single GameModule (standalone) or many (hub).",
   "license": "MIT",
   "main": "dist/index.js",

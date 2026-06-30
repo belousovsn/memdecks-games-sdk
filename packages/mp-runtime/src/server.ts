@@ -18,6 +18,7 @@ import { loadEnv, type RuntimeEnv } from "./env";
 import { createTicketVerifier } from "./auth";
 import { defaultCardProvider, type CardProvider } from "./cards";
 import { defaultTranslateProvider, type TranslateProvider } from "./translate";
+import { createHttpReporter, noopReporter, type LifecycleReporter } from "./reporter";
 import { Room } from "./room";
 
 export interface MultiplayerServerOptions {
@@ -31,6 +32,9 @@ export interface MultiplayerServerOptions {
   cardProvider?: CardProvider;
   /** Custom `ctx.translate` provider; defaults to POST {apiBase}/api/cards/translate. */
   translateProvider?: TranslateProvider;
+  /** Custom lifecycle reporter; defaults to an HTTP push to the platform ledger when
+   *  `env.reportLifecycle` is on, else a no-op. Injectable for tests. */
+  lifecycleReporter?: LifecycleReporter;
 }
 
 export interface MultiplayerServerHandle {
@@ -60,6 +64,11 @@ export function createMultiplayerServer(
   const verify = createTicketVerifier(env);
   const cardProvider = opts.cardProvider ?? defaultCardProvider;
   const translateProvider = opts.translateProvider ?? defaultTranslateProvider;
+  const reporter =
+    opts.lifecycleReporter ??
+    (env.reportLifecycle
+      ? createHttpReporter({ apiBase: env.translatorApiBase })
+      : noopReporter);
 
   const app = express();
   app.use(cors({ origin: env.clientOrigins }));
@@ -120,14 +129,14 @@ export function createMultiplayerServer(
             cardToken: claims.cardToken,
             apiBase: env.translatorApiBase,
           });
-          room = new Room(io, module, claims, translate);
+          room = new Room(io, module, claims, translate, reporter);
           rooms.set(claims.matchId, room);
         }
 
         socket.data.matchId = claims.matchId;
         socket.data.userId = claims.sub;
         socket.join(claims.matchId);
-        room.join(socket.id, claims.sub, cards);
+        room.join(socket.id, claims.sub, cards, claims.cardToken);
       } catch (err) {
         socket.emit(MP_EVENTS.error, { message: (err as Error).message });
       }
@@ -149,6 +158,8 @@ export function createMultiplayerServer(
       if (!room) return;
       room.disconnect(userId);
       if (room.isEmpty()) {
+        // Everyone left: if the match never finished, record it as abandoned.
+        room.reportAbandonIfUnfinished();
         room.dispose();
         rooms.delete(matchId);
       }

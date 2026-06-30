@@ -22,6 +22,13 @@ export { defaultCardProvider } from "./cards";
 export type { CardProvider, CardProviderArgs } from "./cards";
 export { defaultTranslateProvider } from "./translate";
 export type { TranslateProvider, TranslateProviderArgs } from "./translate";
+export { createHttpReporter, noopReporter } from "./reporter";
+export type {
+  LifecycleReporter,
+  LifecycleEvent,
+  LifecycleEventType,
+  HttpReporterOptions,
+} from "./reporter";
 export { Room } from "./room";
 
 // Re-export the contracts so consumers can import everything from the runtime.

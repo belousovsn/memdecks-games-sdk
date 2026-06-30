@@ -37,9 +37,13 @@ const gameModule = {
   },
 };
 
+// Capture lifecycle pushes instead of POSTing them, to assert launch/result fire.
+const lifecycle = [];
+
 const handle = createMultiplayerServer({
   game: gameModule,
   cardProvider: async () => [{ id: "c1", english: "cat", translations: {} }],
+  lifecycleReporter: { report: (e) => lifecycle.push(e) },
   env: {
     port: PORT,
     matchTicketSecret: SECRET,
@@ -54,6 +58,7 @@ const ticket = await new SignJWT({
   seat: 0,
   players: [{ userId: "u1", name: "A", seat: 0 }],
   settings: {},
+  cardToken: "ct-u1",
 })
   .setProtectedHeader({ alg: "HS256" })
   .setIssuer("memdecks-platform")
@@ -109,6 +114,17 @@ try {
   const s2 = await status();
   if (!s2.exists || !s2.over) { ok = false; console.error("FAIL: status after over", JSON.stringify(s2)); }
 
+  // Lifecycle pushes: launch fired on start, result fired on over — each per player,
+  // carrying that player's scoped card token (threaded from the ticket).
+  const launch = lifecycle.find((e) => e.type === "launch");
+  if (!launch || launch.userId !== "u1" || launch.seat !== 0 || launch.cardToken !== "ct-u1") {
+    ok = false; console.error("FAIL: launch lifecycle event", JSON.stringify(launch));
+  }
+  const result = lifecycle.find((e) => e.type === "result");
+  if (!result || !result.result?.ended || result.cardToken !== "ct-u1") {
+    ok = false; console.error("FAIL: result lifecycle event", JSON.stringify(result));
+  }
+
   // A player reconnecting after the match ended is re-shown the outcome (mp:over on rejoin).
   socket2 = io(`http://localhost:${PORT}`, { transports: ["websocket"], forceNew: true });
   const reOver = await new Promise((resolve, reject) => {
@@ -118,7 +134,7 @@ try {
   });
   if (!reOver?.result?.ended) { ok = false; console.error("FAIL: rejoin over payload", JSON.stringify(reOver)); }
 
-  if (ok) console.log("SMOKE OK — match formed, view broadcast, over + status + resume-over verified");
+  if (ok) console.log("SMOKE OK — match formed, view broadcast, over + status + resume-over + lifecycle push verified");
 } catch (e) {
   ok = false;
   console.error("FAIL:", e.message);

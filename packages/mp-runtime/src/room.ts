@@ -14,12 +14,15 @@ import {
   type MpActionPayload,
   type TranslateFn,
 } from "@memdecks/mp-types";
+import { noopReporter, type LifecycleEventType, type LifecycleReporter } from "./reporter";
 
 interface Seat {
   player: MatchedPlayer;
   socketId?: string;
   cards?: Card[];
   present: boolean;
+  /** This player's scoped card token, retained to authorize lifecycle pushes. */
+  cardToken?: string;
 }
 
 export class Room<State = unknown, Action = unknown> {
@@ -29,12 +32,17 @@ export class Room<State = unknown, Action = unknown> {
   private readonly module: GameModule<State, Action>;
   private readonly settings: Record<string, unknown>;
   private readonly translate: TranslateFn | undefined;
+  private readonly reporter: LifecycleReporter;
   private readonly seats = new Map<string, Seat>();
   private state: State | undefined;
   private started = false;
   private over = false;
   private result: GameResult | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  /** Guards so each lifecycle moment is pushed at most once. */
+  private launchReported = false;
+  private resultReported = false;
+  private abandonReported = false;
 
   /** True once the match has finished — read by the runtime's match-status endpoint. */
   hasEnded(): boolean {
@@ -46,6 +54,7 @@ export class Room<State = unknown, Action = unknown> {
     module: GameModule<State, Action>,
     claims: MatchTicketClaims,
     translate?: TranslateFn,
+    reporter: LifecycleReporter = noopReporter,
   ) {
     this.io = io;
     this.module = module;
@@ -53,13 +62,14 @@ export class Room<State = unknown, Action = unknown> {
     this.gameId = claims.gameId;
     this.settings = claims.settings ?? {};
     this.translate = translate;
+    this.reporter = reporter;
     for (const player of claims.players) {
       this.seats.set(player.userId, { player, present: false });
     }
   }
 
   /** Attach a (re)connecting player's socket and cards; start the match when ready. */
-  join(socketId: string, userId: string, cards: Card[]): void {
+  join(socketId: string, userId: string, cards: Card[], cardToken?: string): void {
     const seat = this.seats.get(userId);
     if (!seat) {
       this.io.to(socketId).emit(MP_EVENTS.error, {
@@ -70,6 +80,7 @@ export class Room<State = unknown, Action = unknown> {
     seat.socketId = socketId;
     seat.cards = cards;
     seat.present = true;
+    if (cardToken) seat.cardToken = cardToken;
 
     if (this.started) {
       // Reconnect: send the current view immediately.
@@ -111,7 +122,41 @@ export class Room<State = unknown, Action = unknown> {
     this.timer = undefined;
   }
 
+  /** The match is being torn down because everyone left. If it had started but never
+   *  finished, record it as abandoned in the ledger (once). Call before `dispose()`. */
+  reportAbandonIfUnfinished(): void {
+    if (!this.started || this.over) return;
+    this.reportLifecycle("abandon");
+  }
+
   // ── internals ─────────────────────────────────────────────────────────────
+
+  /** Push a per-player lifecycle moment to the platform (best-effort). */
+  private reportLifecycle(type: LifecycleEventType, result?: GameResult): void {
+    if (type === "launch") {
+      if (this.launchReported) return;
+      this.launchReported = true;
+    } else if (type === "result") {
+      if (this.resultReported) return;
+      this.resultReported = true;
+    } else if (type === "abandon") {
+      if (this.abandonReported) return;
+      this.abandonReported = true;
+    }
+    for (const seat of this.seats.values()) {
+      this.reporter.report({
+        type,
+        matchId: this.matchId,
+        gameId: this.gameId,
+        userId: seat.player.userId,
+        seat: seat.player.seat,
+        ...(seat.player.role !== undefined ? { role: seat.player.role } : {}),
+        ...(seat.player.language !== undefined ? { language: seat.player.language } : {}),
+        ...(seat.cardToken !== undefined ? { cardToken: seat.cardToken } : {}),
+        ...(result !== undefined ? { result } : {}),
+      });
+    }
+  }
 
   private allReady(): boolean {
     for (const seat of this.seats.values()) {
@@ -141,6 +186,7 @@ export class Room<State = unknown, Action = unknown> {
     )
       .then((state) => {
         this.state = state;
+        this.reportLifecycle("launch");
         this.afterMutation();
       })
       .catch((err: unknown) => {
@@ -163,6 +209,7 @@ export class Room<State = unknown, Action = unknown> {
       if (this.timer) clearTimeout(this.timer);
       this.timer = undefined;
       this.io.to(this.matchId).emit(MP_EVENTS.over, { result });
+      this.reportLifecycle("result", result);
       this.module.onResult?.(result);
       return;
     }
