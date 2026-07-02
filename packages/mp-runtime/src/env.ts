@@ -12,12 +12,20 @@ export interface RuntimeEnv {
   matchJwksUrl?: string;
   /** Shared secret for verifying symmetric (HS256) match tickets (dev/simple setups). */
   matchTicketSecret?: string;
+  /** Push match lifecycle (launch/result/abandon) to the platform ledger. Default on;
+   *  set MEMDECKS_REPORT_LIFECYCLE=0/false/off to disable. Best-effort telemetry. */
+  reportLifecycle: boolean;
 }
 
 function csv(value: string | undefined, fallback: string[]): string[] {
   if (!value) return fallback;
   const parts = value.split(",").map((s) => s.trim()).filter(Boolean);
   return parts.length ? parts : fallback;
+}
+
+function bool(value: string | undefined, fallback: boolean): boolean {
+  if (value == null || value.trim() === "") return fallback;
+  return !/^(0|false|off|no)$/i.test(value.trim());
 }
 
 /** Build a RuntimeEnv from process.env, applying any explicit overrides on top. */
@@ -35,6 +43,7 @@ export function loadEnv(overrides: Partial<RuntimeEnv> = {}): RuntimeEnv {
     ...(process.env["MATCH_TICKET_SECRET"]
       ? { matchTicketSecret: process.env["MATCH_TICKET_SECRET"] }
       : {}),
+    reportLifecycle: bool(process.env["MEMDECKS_REPORT_LIFECYCLE"], true),
     ...overrides,
   };
   return env;

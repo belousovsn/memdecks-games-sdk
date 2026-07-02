@@ -8,17 +8,22 @@ import {
   MP_EVENTS,
   type Card,
   type GameModule,
+  type GameResult,
   type MatchTicketClaims,
   type MatchedPlayer,
   type MpActionPayload,
+  type MpPresencePayload,
   type TranslateFn,
 } from "@memdecks/mp-types";
+import { noopReporter, type LifecycleEventType, type LifecycleReporter } from "./reporter";
 
 interface Seat {
   player: MatchedPlayer;
   socketId?: string;
   cards?: Card[];
   present: boolean;
+  /** This player's scoped card token, retained to authorize lifecycle pushes. */
+  cardToken?: string;
 }
 
 export class Room<State = unknown, Action = unknown> {
@@ -28,17 +33,29 @@ export class Room<State = unknown, Action = unknown> {
   private readonly module: GameModule<State, Action>;
   private readonly settings: Record<string, unknown>;
   private readonly translate: TranslateFn | undefined;
+  private readonly reporter: LifecycleReporter;
   private readonly seats = new Map<string, Seat>();
   private state: State | undefined;
   private started = false;
   private over = false;
+  private result: GameResult | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  /** Guards so each lifecycle moment is pushed at most once. */
+  private launchReported = false;
+  private resultReported = false;
+  private abandonReported = false;
+
+  /** True once the match has finished — read by the runtime's match-status endpoint. */
+  hasEnded(): boolean {
+    return this.over;
+  }
 
   constructor(
     io: Server,
     module: GameModule<State, Action>,
     claims: MatchTicketClaims,
     translate?: TranslateFn,
+    reporter: LifecycleReporter = noopReporter,
   ) {
     this.io = io;
     this.module = module;
@@ -46,13 +63,14 @@ export class Room<State = unknown, Action = unknown> {
     this.gameId = claims.gameId;
     this.settings = claims.settings ?? {};
     this.translate = translate;
+    this.reporter = reporter;
     for (const player of claims.players) {
       this.seats.set(player.userId, { player, present: false });
     }
   }
 
   /** Attach a (re)connecting player's socket and cards; start the match when ready. */
-  join(socketId: string, userId: string, cards: Card[]): void {
+  join(socketId: string, userId: string, cards: Card[], cardToken?: string): void {
     const seat = this.seats.get(userId);
     if (!seat) {
       this.io.to(socketId).emit(MP_EVENTS.error, {
@@ -63,10 +81,19 @@ export class Room<State = unknown, Action = unknown> {
     seat.socketId = socketId;
     seat.cards = cards;
     seat.present = true;
+    if (cardToken) seat.cardToken = cardToken;
 
     if (this.started) {
       // Reconnect: send the current view immediately.
       this.emitTo(seat);
+      // If the match already ended while this player was away, re-announce the result so a
+      // resuming/reconnecting client shows its game-over screen instead of a stale board.
+      if (this.over && this.result) {
+        this.io.to(socketId).emit(MP_EVENTS.over, { result: this.result });
+        return;
+      }
+      // A live match: let the game react to the player returning, and tell everyone.
+      this.applyPresence(userId, true);
       return;
     }
     if (this.allReady()) this.start();
@@ -80,12 +107,14 @@ export class Room<State = unknown, Action = unknown> {
     this.afterMutation();
   }
 
-  /** Mark a player disconnected; state is retained for reconnection. */
+  /** Mark a player disconnected; state is retained for reconnection. Lets the game react
+   *  (pause / forfeit / "opponent left") and tells the remaining players. */
   disconnect(userId: string): void {
     const seat = this.seats.get(userId);
     if (!seat) return;
     seat.present = false;
     seat.socketId = undefined;
+    this.applyPresence(userId, false);
   }
 
   /** True when no players remain connected — the server may dispose the room. */
@@ -99,7 +128,41 @@ export class Room<State = unknown, Action = unknown> {
     this.timer = undefined;
   }
 
+  /** The match is being torn down because everyone left. If it had started but never
+   *  finished, record it as abandoned in the ledger (once). Call before `dispose()`. */
+  reportAbandonIfUnfinished(): void {
+    if (!this.started || this.over) return;
+    this.reportLifecycle("abandon");
+  }
+
   // ── internals ─────────────────────────────────────────────────────────────
+
+  /** Push a per-player lifecycle moment to the platform (best-effort). */
+  private reportLifecycle(type: LifecycleEventType, result?: GameResult): void {
+    if (type === "launch") {
+      if (this.launchReported) return;
+      this.launchReported = true;
+    } else if (type === "result") {
+      if (this.resultReported) return;
+      this.resultReported = true;
+    } else if (type === "abandon") {
+      if (this.abandonReported) return;
+      this.abandonReported = true;
+    }
+    for (const seat of this.seats.values()) {
+      this.reporter.report({
+        type,
+        matchId: this.matchId,
+        gameId: this.gameId,
+        userId: seat.player.userId,
+        seat: seat.player.seat,
+        ...(seat.player.role !== undefined ? { role: seat.player.role } : {}),
+        ...(seat.player.language !== undefined ? { language: seat.player.language } : {}),
+        ...(seat.cardToken !== undefined ? { cardToken: seat.cardToken } : {}),
+        ...(result !== undefined ? { result } : {}),
+      });
+    }
+  }
 
   private allReady(): boolean {
     for (const seat of this.seats.values()) {
@@ -129,6 +192,7 @@ export class Room<State = unknown, Action = unknown> {
     )
       .then((state) => {
         this.state = state;
+        this.reportLifecycle("launch");
         this.afterMutation();
       })
       .catch((err: unknown) => {
@@ -147,9 +211,11 @@ export class Room<State = unknown, Action = unknown> {
     const result = this.module.isOver(this.state);
     if (result && !this.over) {
       this.over = true;
+      this.result = result; // retain so a late reconnect can be re-shown the outcome
       if (this.timer) clearTimeout(this.timer);
       this.timer = undefined;
       this.io.to(this.matchId).emit(MP_EVENTS.over, { result });
+      this.reportLifecycle("result", result);
       this.module.onResult?.(result);
       return;
     }
@@ -167,6 +233,25 @@ export class Room<State = unknown, Action = unknown> {
       this.module.tick?.(this.state);
       this.afterMutation();
     }, Math.max(0, delay));
+  }
+
+  /** A rostered player left or returned mid-match: let the game react, tell everyone the
+   *  new presence, then re-broadcast + re-check `isOver` (so a forfeit can end the match). */
+  private applyPresence(userId: string, present: boolean): void {
+    if (!this.started || this.over || this.state === undefined) return;
+    this.module.onPresenceChange?.(this.state, userId, present);
+    this.broadcastPresence();
+    this.afterMutation();
+  }
+
+  /** Push the current roster presence to all connected players. */
+  private broadcastPresence(): void {
+    const payload: MpPresencePayload = {
+      players: [...this.seats.values()]
+        .map((s) => ({ userId: s.player.userId, seat: s.player.seat, present: s.present }))
+        .sort((a, b) => a.seat - b.seat),
+    };
+    this.io.to(this.matchId).emit(MP_EVENTS.presence, payload);
   }
 
   private broadcast(): void {

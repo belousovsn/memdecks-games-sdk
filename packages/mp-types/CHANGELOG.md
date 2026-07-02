@@ -3,6 +3,26 @@
 All notable changes to the shared contracts package are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.4.0 — 2026-06-30
+
+Presence / opponent-left contract (Translator-app#188). Additive and backward
+compatible — **no `PROTOCOL_VERSION` bump** (a new optional `GameModule` method and a
+new server→client event; existing games keep compiling and running).
+
+### Added
+- **`GameModule.onPresenceChange?(state, playerId, present)`** — optional hook the
+  runtime calls when a rostered player drops or returns mid-match. A game can pause,
+  forfeit, or surface "opponent left" by mutating state here; the runtime then
+  re-broadcasts and re-checks `isOver`. Without it, `isOver` only fires on game state,
+  so a vanished player can leave the other hanging.
+- **`MP_EVENTS.presence` (`mp:presence`) + `MpPresencePayload`** — server→client roster
+  presence (`{ userId, seat, present }[]`), broadcast when a player leaves or returns,
+  so a client can show presence without threading it through `viewFor`.
+
+### Note
+- Documents 0.3.0 as well (the `PROTOCOL_VERSION` handshake marker), which shipped
+  without its own changelog entry.
+
 ## 0.2.0 — 2026-06-12
 
 Cross-language / translation contracts. All additive and backward compatible.

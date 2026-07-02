@@ -6,11 +6,14 @@
 import { io, type Socket } from "socket.io-client";
 import {
   MP_EVENTS,
+  PROTOCOL_VERSION,
   type MatchHandoff,
   type MpActionPayload,
   type MpChannelPayload,
   type MpErrorPayload,
+  type MpJoinPayload,
   type MpOverPayload,
+  type MpPresencePayload,
 } from "@memdecks/mp-types";
 
 export interface MatchHandlers<View = unknown> {
@@ -20,6 +23,8 @@ export interface MatchHandlers<View = unknown> {
   onChannel?: (msg: MpChannelPayload) => void;
   /** The match finished. */
   onOver?: (msg: MpOverPayload) => void;
+  /** A rostered player left or returned mid-match (show "opponent left" / "reconnecting"). */
+  onPresence?: (msg: MpPresencePayload) => void;
   /** Server-side error (bad ticket, not in match, etc.). */
   onError?: (msg: MpErrorPayload) => void;
   /** Transport-level connection failure. */
@@ -43,11 +48,13 @@ export function joinMatch<View = unknown>(
   });
 
   socket.on("connect", () => {
-    socket.emit(MP_EVENTS.join, { matchTicket: handoff.matchTicket });
+    const join: MpJoinPayload = { matchTicket: handoff.matchTicket, protocolVersion: PROTOCOL_VERSION };
+    socket.emit(MP_EVENTS.join, join);
   });
   if (handlers.onState) socket.on(MP_EVENTS.state, handlers.onState);
   if (handlers.onChannel) socket.on(MP_EVENTS.channel, handlers.onChannel);
   if (handlers.onOver) socket.on(MP_EVENTS.over, handlers.onOver);
+  if (handlers.onPresence) socket.on(MP_EVENTS.presence, handlers.onPresence);
   if (handlers.onError) socket.on(MP_EVENTS.error, handlers.onError);
   if (handlers.onConnectError) socket.on("connect_error", handlers.onConnectError);
 

@@ -9,6 +9,7 @@ import express from "express";
 import { Server } from "socket.io";
 import {
   MP_EVENTS,
+  PROTOCOL_VERSION,
   type GameModule,
   type MpActionPayload,
   type MpJoinPayload,
@@ -17,6 +18,7 @@ import { loadEnv, type RuntimeEnv } from "./env";
 import { createTicketVerifier } from "./auth";
 import { defaultCardProvider, type CardProvider } from "./cards";
 import { defaultTranslateProvider, type TranslateProvider } from "./translate";
+import { createHttpReporter, noopReporter, type LifecycleReporter } from "./reporter";
 import { Room } from "./room";
 
 export interface MultiplayerServerOptions {
@@ -30,6 +32,9 @@ export interface MultiplayerServerOptions {
   cardProvider?: CardProvider;
   /** Custom `ctx.translate` provider; defaults to POST {apiBase}/api/cards/translate. */
   translateProvider?: TranslateProvider;
+  /** Custom lifecycle reporter; defaults to an HTTP push to the platform ledger when
+   *  `env.reportLifecycle` is on, else a no-op. Injectable for tests. */
+  lifecycleReporter?: LifecycleReporter;
 }
 
 export interface MultiplayerServerHandle {
@@ -59,6 +64,11 @@ export function createMultiplayerServer(
   const verify = createTicketVerifier(env);
   const cardProvider = opts.cardProvider ?? defaultCardProvider;
   const translateProvider = opts.translateProvider ?? defaultTranslateProvider;
+  const reporter =
+    opts.lifecycleReporter ??
+    (env.reportLifecycle
+      ? createHttpReporter({ apiBase: env.translatorApiBase })
+      : noopReporter);
 
   const app = express();
   app.use(cors({ origin: env.clientOrigins }));
@@ -78,10 +88,26 @@ export function createMultiplayerServer(
 
   const rooms = new Map<string, Room>();
 
+  // Liveness + match status for the platform: lets the host tell "still running" from
+  // "finished" from "server unreachable" while a player has the game backgrounded. No game
+  // state is exposed. `exists:false` = never started or already disposed (everyone left).
+  app.get("/matches/:matchId/status", (req, res) => {
+    const room = rooms.get(req.params.matchId);
+    res.json({ exists: Boolean(room), over: room?.hasEnded() ?? false });
+  });
+
   io.on("connection", (socket) => {
     socket.on(MP_EVENTS.join, async (payload: MpJoinPayload) => {
       try {
         if (!payload?.matchTicket) throw new Error("missing matchTicket");
+        // Reject a client built against a breaking (different major) contract; tolerate an
+        // absent version (older client). See AGENTS.md "Evolving the contract".
+        if (payload.protocolVersion != null && payload.protocolVersion !== PROTOCOL_VERSION) {
+          socket.emit(MP_EVENTS.error, {
+            message: `Incompatible protocol version: game v${payload.protocolVersion}, runtime v${PROTOCOL_VERSION}. Update the game.`,
+          });
+          return;
+        }
         const claims = await verify(payload.matchTicket);
 
         const module = modules.get(claims.gameId);
@@ -103,14 +129,14 @@ export function createMultiplayerServer(
             cardToken: claims.cardToken,
             apiBase: env.translatorApiBase,
           });
-          room = new Room(io, module, claims, translate);
+          room = new Room(io, module, claims, translate, reporter);
           rooms.set(claims.matchId, room);
         }
 
         socket.data.matchId = claims.matchId;
         socket.data.userId = claims.sub;
         socket.join(claims.matchId);
-        room.join(socket.id, claims.sub, cards);
+        room.join(socket.id, claims.sub, cards, claims.cardToken);
       } catch (err) {
         socket.emit(MP_EVENTS.error, { message: (err as Error).message });
       }
@@ -132,6 +158,8 @@ export function createMultiplayerServer(
       if (!room) return;
       room.disconnect(userId);
       if (room.isEmpty()) {
+        // Everyone left: if the match never finished, record it as abandoned.
+        room.reportAbandonIfUnfinished();
         room.dispose();
         rooms.delete(matchId);
       }

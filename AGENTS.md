@@ -94,6 +94,41 @@ const conn = joinMatch(session!.match!, {
 conn.sendAction("guess", { fieldId, seq });
 ```
 
+## Evolving the contract
+
+`@memdecks/mp-types` is the **wire boundary** shared by three independently-deployed
+parties: the Translator host/lobby (sender), the `mp-runtime` (server), and every game
+(receiver). They don't share a build, so a change here can silently break a game that
+hasn't been rebuilt. Treat the contract as a published API. Governance: Translator-app#187.
+
+**Version marker.** `PROTOCOL_VERSION` (in `protocol.ts`) is the integer major version of
+the wire contract. It rides along in the handshakes — `translator:init` and `game:ready`
+(bridge) and `mp:join` (runtime). Receivers tolerate an **absent** version (old peers) but
+warn/refuse on a **major** mismatch. Bump it only on a breaking change, and bump the
+package `version` alongside.
+
+**Classify every change:**
+- **Additive (no major bump)** — a new optional field, a new event/channel, a new optional
+  `GameModule` method. Existing games keep compiling and running.
+- **Breaking (major bump)** — renaming/removing a field or event, changing a type, making
+  an optional field required, or changing the meaning of an existing message.
+
+**Default to additive + feature-detection** so old games keep working. Examples already in
+the tree: the host treats `game:rematch` as a no-op when unhandled, and the lobby's
+`lobby:error` carries an optional `code` with a message-string fallback. Reach for a
+breaking change only when additive genuinely can't express it.
+
+**Change checklist** (in order):
+1. Edit `@memdecks/mp-types` **first** — it's the source of truth.
+2. Classify breaking vs additive; if breaking, bump `PROTOCOL_VERSION`.
+3. Bump the package `version` (semver) and add a changelog entry.
+4. Update `@memdecks/mp-runtime`, `@memdecks/mp-client`, and the examples/templates.
+5. Update the Translator host/lobby (today: its mirrored copies — keep them in lockstep;
+   see the source-of-truth pointers in `translator/client/view/lobbyController.ts`).
+6. Publish, then notify game authors. For a breaking change, support old **and** new
+   behind the version for a migration window before removing the old path.
+7. Extend contract/lifecycle tests (Translator-app#185).
+
 ## Status
 
 - ✅ `@memdecks/mp-types` — contracts.

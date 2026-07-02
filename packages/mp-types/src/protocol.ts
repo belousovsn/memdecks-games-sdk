@@ -5,6 +5,16 @@
  */
 import type { GameResult } from "./game-module";
 
+/**
+ * Major version of the wire contract (bridge messages + MP_EVENTS + payload shapes).
+ * It rides along in the handshakes (`translator:init`, `game:ready`, `mp:join`) so the
+ * three independently-deployed parties — host, runtime, game — can detect a mismatch
+ * instead of breaking silently. Bump ONLY on a breaking change (see AGENTS.md "Evolving
+ * the contract"); receivers tolerate an absent version (old peers) but reject a different
+ * major. Governance: Translator-app#187.
+ */
+export const PROTOCOL_VERSION = 1;
+
 export const MP_EVENTS = {
   /** client -> server: join the match using the signed match ticket. */
   join: "mp:join",
@@ -16,6 +26,9 @@ export const MP_EVENTS = {
   channel: "mp:channel",
   /** server -> client: the match finished. */
   over: "mp:over",
+  /** server -> client: a rostered player's presence changed (left / returned). Lets a
+   *  client show "opponent left" / "reconnecting" without threading it through viewFor. */
+  presence: "mp:presence",
   /** server -> client: an error (bad ticket, not in match, etc.). */
   error: "mp:error",
 } as const;
@@ -24,6 +37,9 @@ export type MpEvent = (typeof MP_EVENTS)[keyof typeof MP_EVENTS];
 
 export interface MpJoinPayload {
   matchTicket: string;
+  /** The game client's PROTOCOL_VERSION. Optional for back-compat; the runtime rejects a
+   *  different major and tolerates its absence (older clients). */
+  protocolVersion?: number;
 }
 
 export interface MpActionPayload {
@@ -39,6 +55,17 @@ export interface MpChannelPayload {
 
 export interface MpOverPayload {
   result: GameResult;
+}
+
+/** server -> client: the roster's current presence, broadcast when a player leaves or
+ *  returns mid-match. */
+export interface MpPresencePayload {
+  players: Array<{
+    userId: string;
+    seat: number;
+    /** False while the player is disconnected (refresh / backgrounded / left). */
+    present: boolean;
+  }>;
 }
 
 export interface MpErrorPayload {

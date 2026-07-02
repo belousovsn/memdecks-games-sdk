@@ -1,6 +1,6 @@
 {
   "name": "@memdecks/mp-client",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Browser-side helper for memdecks games: the translator:init bridge, authenticated match join over Socket.IO, and the single-player card fetch.",
   "license": "MIT",
   "main": "dist/index.js",
@@ -13,7 +13,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@memdecks/mp-types": "^0.1.0",
+    "@memdecks/mp-types": "^0.4.0",
     "socket.io-client": "^4.7.2"
   },
   "devDependencies": {
