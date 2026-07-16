@@ -65,6 +65,10 @@ authorized by each player's scoped card token (already on the match ticket — n
   (Translator-app#177). If it doesn't, the POSTs 404 — harmless, but you'll see warn logs.
   Deploy the Translator ledger to a given environment **before** upgrading that environment's
   runtimes.
+- **Coming next:** per-card learning events (`card_practiced`, Translator-app#216) ride the
+  same endpoint and auth; a runtime helper will land as a minor release. Custom runtimes can
+  already POST them directly — one event per answered card, **unique `idempotencyKey` per
+  answer**, `payload: { cardId, correct }`, no card text.
 
 ## Upgrade cleanly: bump the three `@memdecks/*` together
 

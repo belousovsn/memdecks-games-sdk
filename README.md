@@ -34,6 +34,21 @@ postMessage bridge, and (for multiplayer) run their realtime session on an
 
 See [AGENTS.md](AGENTS.md) for the contract summary aimed at LLM coding agents.
 
+## Reporting to the platform ledger
+
+The platform keeps a server-owned **game session ledger** — the durable record feeding
+learning metrics and analytics.
+
+- **Match lifecycle (launch / result / abandon):** `mp-runtime` ≥ 0.4.0 pushes it
+  automatically, authorized per player by their scoped card token. Best-effort, never
+  affects gameplay; opt out with `MEMDECKS_REPORT_LIFECYCLE=false`. See
+  [UPGRADING.md](UPGRADING.md).
+- **Per-card answers (`card_practiced`) — planned (Translator-app#216):** the platform's
+  recall/retention metrics need per-answer events (`cardId`, `correct`, unique idempotency
+  key per answer). An `mp-runtime` helper is coming; until then a custom runtime can POST
+  the same `/api/games/events` endpoint directly — contract and rules in the private repo's
+  `GAME_INTEGRATION.md` ("Learning events"). Never put card text in the payload.
+
 ## Develop
 
 ```bash
