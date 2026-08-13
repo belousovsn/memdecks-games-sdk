@@ -10,7 +10,8 @@ import type { MatchHandoff } from "./match";
 /** Contract-filtered card reference from `POST /api/games/resolve`. */
 export interface ResolvedCardRef {
   cardId: string;
-  wordId: string;
+  /** Catalog identity, omitted for imports that have not been matched to the dictionary. */
+  wordId?: number | string;
 }
 
 /** Messages the GAME (iframe) sends UP to the Translator parent. */
@@ -33,8 +34,7 @@ export interface TranslatorInitMessage {
   /** Resolved Translator user id, when known. */
   userId?: string;
   /**
-   * Legacy Supabase access token. Still provided for client-side TTS (Supabase
-   * storage). Prefer `gameToken` for API/server calls.
+   * Legacy Supabase access token. Prefer `gameToken` for API/server calls.
    */
   accessToken?: string | null;
   /** Scoped, short-lived card token for server-side card fetches. */

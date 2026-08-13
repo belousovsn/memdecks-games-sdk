@@ -25,9 +25,20 @@ export interface CardTranslation {
   word: string;
   /** Romanized form, when available. */
   transliteration?: string;
-  /** TTS audio file name/path; resolve against Supabase storage on the client. */
+  /** Legacy generated-TTS file name/path. Prefer mp-client's card audio resolver. */
   ttsFile?: string;
 }
+
+/** Response from the platform's card-first audio endpoint. */
+export type CardAudioResponse =
+  | {
+      status: "ready";
+      source: "imported" | "tts";
+      url: string;
+      /** Expiry for short-lived private/signed URLs. */
+      expiresAt?: string;
+    }
+  | { status: "unavailable" };
 
 /** A study card: an English prompt + image, with one or more target-language translations. */
 export interface Card {

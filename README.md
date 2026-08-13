@@ -67,6 +67,24 @@ npm run build      # builds the three packages (dependency-ordered)
 
 Agents: see [CLAUDE.md](CLAUDE.md) and each template's `AGENTS.md`.
 
+## Play card audio
+
+Use the card-first helper in browser games. It handles imported Anki attachments and
+generated TTS through the same authenticated platform endpoint:
+
+```ts
+import { createCardAudio, initGame } from "@memdecks/mp-client";
+
+const { session } = await initGame();
+if (session) {
+  const audio = createCardAudio(session);
+  await audio.play(card); // Card, resolved card reference, or card id
+}
+```
+
+Do not assemble Supabase bucket URLs in a game. A resolved card always has `cardId`, while
+`wordId` is optional for imports that have not been catalog-matched.
+
 ## Publishing & keeping the contract in sync
 
 The integration contract lives in these packages, and **both** external games **and** the

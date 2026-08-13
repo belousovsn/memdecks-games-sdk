@@ -3,6 +3,20 @@
 All notable changes to the shared contracts package are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.5.0 — 2026-08-14
+
+Card-first audio and imported-card compatibility (Translator-app#271). Additive wire
+change; `PROTOCOL_VERSION` remains `1`.
+
+### Added
+- `CardAudioResponse`, the platform response shared by imported audio and generated TTS.
+
+### Changed
+- `ResolvedCardRef.wordId` is optional and accepts the numeric catalog ids sent by the
+  core app. A card imported from Anki can now participate in a generic game before it is
+  matched to the catalog; games with topic/deck/tier requirements still receive only
+  catalog-backed cards.
+
 ## 0.4.0 — 2026-06-30
 
 Presence / opponent-left contract (Translator-app#188). Additive and backward
