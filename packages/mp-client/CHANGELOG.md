@@ -3,6 +3,18 @@
 All notable changes to the browser-side helper are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.4.0 — 2026-08-14
+
+### Added
+- `createCardAudio(session)` with `resolve(card)`, `play(card)`, `stop()`, and `clear()`.
+  Games pass a card or card id; the platform chooses imported audio or generated TTS,
+  performs ownership checks, and returns a playable URL. Signed URLs are cached only
+  until shortly before their expiry and refreshed tokens are read from the live session.
+
+### Changed
+- Bumped `@memdecks/mp-types` to `^0.5.0` for `CardAudioResponse` and optional imported
+  card `wordId` support.
+
 ## 0.3.0 — 2026-06-30
 
 Presence / opponent-left handling (Translator-app#188). Additive.

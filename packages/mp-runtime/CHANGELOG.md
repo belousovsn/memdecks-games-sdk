@@ -3,6 +3,12 @@
 All notable changes to the game session engine are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.6.0 — 2026-08-14
+
+### Changed
+- Bumped `@memdecks/mp-types` to `^0.5.0` so runtime consumers share the optional
+  `ResolvedCardRef.wordId` and card-audio response contract. Runtime behavior is unchanged.
+
 ## 0.5.0 — 2026-06-30
 
 Presence / opponent-left handling (Translator-app#188). Additive — no

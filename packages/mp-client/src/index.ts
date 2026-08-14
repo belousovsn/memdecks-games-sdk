@@ -15,6 +15,8 @@ export type { GameSession, InitOptions, TranslatorBridge } from "./bridge";
 export { joinMatch } from "./match";
 export type { MatchHandlers, MatchConnection } from "./match";
 export { fetchUserCards } from "./cards";
+export { createCardAudio } from "./audio";
+export type { CardAudioClient, CardAudioRef, PlayCardAudioOptions } from "./audio";
 
 // Re-export the contracts for convenience.
 export * from "@memdecks/mp-types";

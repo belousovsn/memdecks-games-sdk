@@ -8,6 +8,9 @@ mixed versions across the three parties (host, runtime, game) interoperate.
 
 | Package | Version | What's new |
 | --- | --- | --- |
+| `@memdecks/mp-types` | 0.5.0 | Card-audio response; `ResolvedCardRef.wordId` is optional for imported cards |
+| `@memdecks/mp-client` | 0.4.0 | `createCardAudio(session)` storage-agnostic resolver/player |
+| `@memdecks/mp-runtime` | 0.6.0 | Uses the 0.5 card contract; no runtime behavior change |
 | `@memdecks/mp-types` | 0.4.0 | `GameModule.onPresenceChange?` hook; `MP_EVENTS.presence` + `MpPresencePayload` |
 | `@memdecks/mp-runtime` | 0.4.0 | Lifecycle push to the platform session ledger (launch/result/abandon) |
 | `@memdecks/mp-runtime` | 0.5.0 | Presence broadcast + `onPresenceChange` + `isOver` re-check on leave/return |
@@ -15,6 +18,24 @@ mixed versions across the three parties (host, runtime, game) interoperate.
 
 (0.3.x on runtime/types — the `/matches/:id/status` route and the `PROTOCOL_VERSION`
 handshake marker — is folded into these notes.)
+
+## Imported-card audio (0.5 types / 0.4 client)
+
+Generic games may now receive a resolved card reference without `wordId`; `cardId` is the
+stable gameplay identity. Only read `wordId` after checking it exists. Topic-pack, curated
+deck, and tier-constrained games continue to receive catalog-backed cards.
+
+Browser games should stop constructing Supabase storage URLs from `ttsFile`. The same call
+now plays either an Anki attachment or generated TTS:
+
+```ts
+const audio = createCardAudio(session);
+await audio.play(card); // Card, ResolvedCardRef, or card id
+```
+
+The helper uses the current scoped token, refreshes expiring signed URLs, and returns `null`
+when the card has no audio. No `PROTOCOL_VERSION` bump is required: all new fields and
+behaviors are optional/additive on the existing version-1 bridge.
 
 ## Does this break current games? No.
 

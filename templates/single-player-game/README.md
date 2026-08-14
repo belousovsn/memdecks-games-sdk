@@ -11,6 +11,7 @@ npm run build
 It uses only `@memdecks/mp-client`:
 - `initGame()` — the `translator:init` bridge (identity + tokens + optional cards).
 - `fetchUserCards(session)` — the player's deck via the scoped token.
+- `createCardAudio(session)` — plays imported Anki audio or generated TTS by card id.
 
 Wire `src/main.ts` into your framework (React, Vue, vanilla — anything). Keep Vite `base`
 at `/`. See [`AGENTS.md`](AGENTS.md) for the checklist.
