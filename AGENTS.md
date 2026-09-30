@@ -65,7 +65,7 @@ async createMatch(ctx: MatchContext): Promise<State> {
 
   // t[word][lang] is a CardTranslation, or null when the platform has none.
   const labelFor = (word: string, lang?: string) =>
-    (lang && t[word]?.[lang]?.text) || word;     // fall back to English
+    (lang && t[word]?.[lang]?.word) || word;     // fall back to English
 
   return buildState(ctx, labelFor);
 }
@@ -75,6 +75,11 @@ Notes:
 - `ctx.translate` is **absent** when the runtime has no translate provider — always guard.
 - It returns `null` per word/language the platform can't translate; fall back to English.
 - Call it **once** in `createMatch` for the words you actually use; it is not a per-frame API.
+- A bare word gets its **primary meaning**. A card can hold another one (`Card.senseKey`,
+  e.g. `march` the month), and then `ctx.translateSenses(cards.map(senseRequestFor), langs)`
+  translates exactly that meaning; results come back in request order. See `UPGRADING.md`.
+- Don't pool cards by English word alone: key concepts by
+  `(english, partOfSpeech, senseKey)`, falling back to the word when `senseKey` is absent.
 
 ## Client quickstart (`@memdecks/mp-client`)
 

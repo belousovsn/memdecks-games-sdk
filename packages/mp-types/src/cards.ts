@@ -27,6 +27,13 @@ export interface CardTranslation {
   transliteration?: string;
   /** Legacy generated-TTS file name/path. Prefer mp-client's card audio resolver. */
   ttsFile?: string;
+  /**
+   * The meaning this word translates, e.g. `"month"` for March the month. Absent when the
+   * platform does not know the meaning (a legacy card, or a machine-translated miss).
+   */
+  senseKey?: string;
+  /** Short English note for that meaning, e.g. `"third month of the year"`. */
+  briefGloss?: string;
 }
 
 /** Response from the platform's card-first audio endpoint. */
@@ -51,4 +58,25 @@ export interface Card {
   imageUrl?: string;
   /** Per-language translations, keyed by LanguageCode. */
   translations: Partial<Record<LanguageCode, CardTranslation>>;
+  /** Dictionary form of the English word, when the card is catalog-backed. */
+  sourceLemma?: string;
+  /**
+   * Which meaning of the English word the card was saved on. One English word can back
+   * several cards (`watch` the timepiece, `watch` the verb), so a game that pools cards
+   * into concepts should key them by `(english, partOfSpeech, senseKey)`, and fall back to
+   * the English word only when `senseKey` is absent. Absent on legacy cards.
+   */
+  senseKey?: string;
+  /** Short English note for the meaning; show it when two cards in play share a word. */
+  senseGloss?: string;
 }
+
+/** One meaning of an English word, as `ctx.translateSenses` asks for it. */
+export interface TranslateSenseRequest {
+  /** English dictionary form: the card's `sourceLemma`, else its `english`. */
+  word: string;
+  /** Part of speech. Send it: sense keys belong to one lexeme, and `"main"` is on all. */
+  pos?: string;
+  senseKey?: string;
+}
+

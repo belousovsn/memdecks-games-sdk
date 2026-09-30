@@ -8,6 +8,9 @@ mixed versions across the three parties (host, runtime, game) interoperate.
 
 | Package | Version | What's new |
 | --- | --- | --- |
+| `@memdecks/mp-types` | 0.6.0 | Card meaning: `Card.senseKey/senseGloss/sourceLemma`, `CardTranslation.senseKey/briefGloss`, `ctx.translateSenses` |
+| `@memdecks/mp-runtime` | 0.7.0 | `ctx.translateSenses` provider, `senseRequestFor(card)`; `defaultCardProvider` normalizes `/api/cards` rows |
+| `@memdecks/mp-client` | 0.4.1 | Depends on `mp-types ^0.6.0`; no behavior change |
 | `@memdecks/mp-types` | 0.5.0 | Card-audio response; `ResolvedCardRef.wordId` is optional for imported cards |
 | `@memdecks/mp-client` | 0.4.0 | `createCardAudio(session)` storage-agnostic resolver/player |
 | `@memdecks/mp-runtime` | 0.6.0 | Uses the 0.5 card contract; no runtime behavior change |
@@ -18,6 +21,40 @@ mixed versions across the three parties (host, runtime, game) interoperate.
 
 (0.3.x on runtime/types — the `/matches/:id/status` route and the `PROTOCOL_VERSION`
 handshake marker — is folded into these notes.)
+
+## Card meanings (0.6 types / 0.7 runtime)
+
+One English word can back several cards: `watch` the timepiece and `watch` the verb, or
+`march` the walk and `march` the month. Cards now say which meaning they hold.
+
+- `Card.senseKey` names the meaning, `Card.senseGloss` is its short English note, and
+  `Card.sourceLemma` is the dictionary form (`car` for a card that reads `the car`). All
+  three are absent on legacy cards.
+- A game that pools cards into concepts should key them by
+  `(english, partOfSpeech, senseKey)` and fall back to the English word only when
+  `senseKey` is absent. When two cards in play share an English word, show `senseGloss`
+  under the prompt.
+- `ctx.translate(["march"])` still returns the primary meaning. To show an opponent the
+  meaning a card was saved on, use `ctx.translateSenses`:
+
+```ts
+import { senseRequestFor } from "@memdecks/mp-runtime";
+
+const results = ctx.translateSenses
+  ? await ctx.translateSenses(picked.map(senseRequestFor), langs)
+  : [];
+// results[i] answers picked[i]; results[i].translations[lang] is a CardTranslation or null.
+```
+
+A language that lacks the meaning gets the primary one, and then the returned
+`translations[lang].senseKey` differs from the requested key. Against a platform that
+predates meanings, the default provider falls back to translating by word.
+
+`defaultCardProvider` used to pass `/api/cards` rows through untouched, so a game on it got
+snake_case rows typed as `Card`. It now returns real `Card` objects, meaning included; rows
+without an English side or a study word are dropped. Games with their own `cardProvider`
+are unaffected, and can map `sense_key`, `sense_gloss` and `source_lemma` themselves or call
+`normalizeCardRow`.
 
 ## Imported-card audio (0.5 types / 0.4 client)
 

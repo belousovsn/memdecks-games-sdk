@@ -14,6 +14,7 @@ import {
   type MpActionPayload,
   type MpPresencePayload,
   type TranslateFn,
+  type TranslateSensesFn,
 } from "@memdecks/mp-types";
 import { noopReporter, type LifecycleEventType, type LifecycleReporter } from "./reporter";
 
@@ -33,6 +34,7 @@ export class Room<State = unknown, Action = unknown> {
   private readonly module: GameModule<State, Action>;
   private readonly settings: Record<string, unknown>;
   private readonly translate: TranslateFn | undefined;
+  private readonly translateSenses: TranslateSensesFn | undefined;
   private readonly reporter: LifecycleReporter;
   private readonly seats = new Map<string, Seat>();
   private state: State | undefined;
@@ -56,6 +58,7 @@ export class Room<State = unknown, Action = unknown> {
     claims: MatchTicketClaims,
     translate?: TranslateFn,
     reporter: LifecycleReporter = noopReporter,
+    translateSenses?: TranslateSensesFn,
   ) {
     this.io = io;
     this.module = module;
@@ -63,6 +66,7 @@ export class Room<State = unknown, Action = unknown> {
     this.gameId = claims.gameId;
     this.settings = claims.settings ?? {};
     this.translate = translate;
+    this.translateSenses = translateSenses;
     this.reporter = reporter;
     for (const player of claims.players) {
       this.seats.set(player.userId, { player, present: false });
@@ -188,6 +192,7 @@ export class Room<State = unknown, Action = unknown> {
         settings: this.settings,
         cards,
         ...(this.translate ? { translate: this.translate } : {}),
+        ...(this.translateSenses ? { translateSenses: this.translateSenses } : {}),
       }),
     )
       .then((state) => {
