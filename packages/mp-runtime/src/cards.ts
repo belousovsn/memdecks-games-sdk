@@ -11,6 +11,8 @@ export interface CardProviderArgs {
   cardToken?: string;
   /** Translator API base URL. */
   apiBase: string;
+  /** The player's base language from the match ticket, when the platform sent it. */
+  baseLanguage?: string;
 }
 
 export type CardProvider = (args: CardProviderArgs) => Promise<Card[]>;
@@ -47,26 +49,37 @@ function toPartOfSpeech(value: unknown): PartOfSpeech | undefined {
 }
 
 /**
- * One `/api/cards` row → SDK Card, or null without an English side and a study word.
+ * One `/api/cards` row → SDK Card, or null when the row has no usable pair.
  * Carries the card's meaning (`senseKey`, `senseGloss`, `sourceLemma`) so a game can tell
  * two cards of one English word apart.
+ *
+ * A row with an English side is prompted in English. A row of a pair without English
+ * (Russian → Armenian) is prompted in the player's base language and keyed by
+ * `source_lemma`, the English dictionary form of its meaning; without one it is dropped,
+ * because nothing would connect it to another player's cards. The base side is
+ * `options.baseLanguage` when the row has it, else the side the card was saved from.
  */
-export function normalizeCardRow(row: unknown): Card | null {
+export function normalizeCardRow(row: unknown, options: { baseLanguage?: string } = {}): Card | null {
   if (isCard(row)) return row;
   const r = (row ?? {}) as ApiCardRow;
   if (!r.id) return null;
 
   const englishSide = r.source_lang === "en" ? "source" : r.target_lang === "en" ? "target" : null;
-  if (!englishSide) return null;
-  const english = englishSide === "source" ? r.source_word : r.target_word;
-  const language = englishSide === "source" ? r.target_lang : r.source_lang;
-  const word = englishSide === "source" ? r.target_word : r.source_word;
-  if (!english || !language || !word) return null;
+  const promptSide = englishSide ?? (options.baseLanguage && options.baseLanguage === r.target_lang ? "target" : "source");
+  const prompt = promptSide === "source" ? r.source_word : r.target_word;
+  const promptLanguage = promptSide === "source" ? r.source_lang : r.target_lang;
+  const language = promptSide === "source" ? r.target_lang : r.source_lang;
+  const word = promptSide === "source" ? r.target_word : r.source_word;
+  const english = englishSide ? prompt : r.source_lemma;
+  if (!english || !prompt || !promptLanguage || !language || !word) return null;
 
+  // `transliteration` and `ttsfile` describe the row's target word. A row with an English
+  // side keeps them either way, as it always has.
+  const describesWord = englishSide !== null || promptSide === "source";
   const translation: CardTranslation = {
     word,
-    ...(r.transliteration ? { transliteration: r.transliteration } : {}),
-    ...(r.ttsfile ? { ttsFile: r.ttsfile } : {}),
+    ...(describesWord && r.transliteration ? { transliteration: r.transliteration } : {}),
+    ...(describesWord && r.ttsfile ? { ttsFile: r.ttsfile } : {}),
     ...(r.sense_key ? { senseKey: r.sense_key } : {}),
     ...(r.sense_gloss ? { briefGloss: r.sense_gloss } : {}),
   };
@@ -76,6 +89,8 @@ export function normalizeCardRow(row: unknown): Card | null {
   return {
     id: r.id,
     english,
+    prompt,
+    promptLanguage,
     ...(partOfSpeech ? { partOfSpeech } : {}),
     ...(imageUrl ? { imageUrl } : {}),
     translations: { [language]: translation },
@@ -89,7 +104,7 @@ export function normalizeCardRow(row: unknown): Card | null {
  * Default provider: GET {apiBase}/api/cards with the scoped token, normalized to Card.
  * Rows that are already Card-shaped pass through unchanged.
  */
-export const defaultCardProvider: CardProvider = async ({ cardToken, apiBase }) => {
+export const defaultCardProvider: CardProvider = async ({ cardToken, apiBase, baseLanguage }) => {
   if (!cardToken) {
     throw new Error("No scoped card token in match ticket; cannot fetch cards.");
   }
@@ -102,6 +117,6 @@ export const defaultCardProvider: CardProvider = async ({ cardToken, apiBase }) 
   }
   const data: unknown = await res.json();
   return Array.isArray(data)
-    ? data.map(normalizeCardRow).filter((card): card is Card => card !== null)
+    ? data.map((row) => normalizeCardRow(row, baseLanguage ? { baseLanguage } : {})).filter((card): card is Card => card !== null)
     : [];
 };

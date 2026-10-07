@@ -124,10 +124,12 @@ export function createMultiplayerServer(
           return;
         }
 
+        const baseLanguage = claims.players.find((player) => player.userId === claims.sub)?.baseLanguage;
         const cards = await cardProvider({
           userId: claims.sub,
           cardToken: claims.cardToken,
           apiBase: env.translatorApiBase,
+          ...(baseLanguage ? { baseLanguage } : {}),
         });
 
         let room = rooms.get(claims.matchId);

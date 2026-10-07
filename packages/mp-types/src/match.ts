@@ -19,6 +19,12 @@ export interface MatchedPlayer {
   role?: string;
   /** Study language from the player's account settings (e.g. "gr"), when known. */
   language?: string;
+  /**
+   * Language the player reads prompts and explanations in (e.g. "ru"), when known.
+   * Absent means English. To show this player a card another player brought, ask
+   * `ctx.translateSenses` for this language; for English use `card.english`.
+   */
+  baseLanguage?: string;
 }
 
 /**

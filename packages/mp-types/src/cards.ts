@@ -6,7 +6,7 @@
  */
 
 /**
- * Language code. `'en'` is the prompt/source language; studied languages are codes
+ * Language code. `'en'` names concepts and is the default prompt language; studied languages are codes
  * like `'hy'` (Armenian), `'gr'` (Greek), `'ru'` (Russian). Kept open as `string`
  * so new languages don't require an SDK release.
  */
@@ -47,12 +47,28 @@ export type CardAudioResponse =
     }
   | { status: "unavailable" };
 
-/** A study card: an English prompt + image, with one or more target-language translations. */
+/**
+ * A study card: a prompt in the player's own language + image, with one or more
+ * study-language translations.
+ */
 export interface Card {
   /** Stable Translator card id. */
   id: string;
-  /** English prompt shown to the player. */
+  /**
+   * The card's English word. It names the concept for every player, whatever language they
+   * read, so pool and match cards by it. It is also the prompt of a player whose base
+   * language is English. A card saved from Russian to Armenian carries the English
+   * dictionary form of its meaning here.
+   */
   english: string;
+  /**
+   * The word this player reads the card by, in `promptLanguage`: `берег` for a card saved
+   * from Russian. Equal to `english` on an English-base card. Show
+   * `card.prompt ?? card.english`; a runtime that predates base languages leaves it out.
+   */
+  prompt?: string;
+  /** Language of `prompt`. Absent together with it. */
+  promptLanguage?: LanguageCode;
   partOfSpeech?: PartOfSpeech;
   /** Image to reveal/show during play. */
   imageUrl?: string;

@@ -3,6 +3,24 @@
 All notable changes to the game session engine are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.8.0 — 2026-10-07
+
+Cards of a pair without English (Translator-app#565).
+
+### Changed
+- `defaultCardProvider` and `normalizeCardRow` keep a card saved between two non-English
+  languages. It used to be dropped. Its `english` is the English dictionary form of the
+  meaning (`source_lemma`), and `prompt` / `promptLanguage` hold the word in the player's
+  base language. Every card now has `prompt`.
+- `CardProviderArgs.baseLanguage` carries the player's base language from the ticket.
+- Bumped `@memdecks/mp-types` to `^0.7.0`.
+
+### Migration
+- Show `card.prompt ?? card.english` where the game shows a card to its owner. Keep
+  pooling and matching by `english` (with `senseKey`).
+- To show a card to another player, translate it into that player's `baseLanguage` with
+  `ctx.translateSenses`, the same call that gives the study-language word.
+
 ## 0.6.0 — 2026-08-14
 
 ### Changed

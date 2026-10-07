@@ -11,6 +11,9 @@ mixed versions across the three parties (host, runtime, game) interoperate.
 | `@memdecks/mp-types` | 0.6.0 | Card meaning: `Card.senseKey/senseGloss/sourceLemma`, `CardTranslation.senseKey/briefGloss`, `ctx.translateSenses` |
 | `@memdecks/mp-runtime` | 0.7.0 | `ctx.translateSenses` provider, `senseRequestFor(card)`; `defaultCardProvider` normalizes `/api/cards` rows |
 | `@memdecks/mp-client` | 0.4.1 | Depends on `mp-types ^0.6.0`; no behavior change |
+| `@memdecks/mp-types` | 0.7.0 | `Card.prompt` / `promptLanguage`, `MatchedPlayer.baseLanguage`, `uiLocale` / `explanationLang` in `translator:init` |
+| `@memdecks/mp-runtime` | 0.8.0 | Cards of a pair without English are kept and prompted in the player's base language |
+| `@memdecks/mp-client` | 0.4.2 | Uses the 0.7 types; no behavior change |
 | `@memdecks/mp-types` | 0.5.0 | Card-audio response; `ResolvedCardRef.wordId` is optional for imported cards |
 | `@memdecks/mp-client` | 0.4.0 | `createCardAudio(session)` storage-agnostic resolver/player |
 | `@memdecks/mp-runtime` | 0.6.0 | Uses the 0.5 card contract; no runtime behavior change |
@@ -21,6 +24,35 @@ mixed versions across the three parties (host, runtime, game) interoperate.
 
 (0.3.x on runtime/types — the `/matches/:id/status` route and the `PROTOCOL_VERSION`
 handshake marker — is folded into these notes.)
+
+## Players who do not read English (0.7 types / 0.8 runtime)
+
+A player can study Armenian from Russian. Their cards have no English side, and the
+runtime used to drop them, so such a player arrived in a game with an empty deck.
+
+- `Card.english` is the concept key for every player. On a Russian → Armenian card it is
+  the English dictionary form of the meaning the card was saved on. Keep pooling and
+  matching by it.
+- `Card.prompt` is the word the card's owner reads, in `Card.promptLanguage`. On an
+  English-base card it equals `english`. Show `card.prompt ?? card.english`.
+- `MatchedPlayer.baseLanguage` is the language a player reads prompts in. Absent means
+  English.
+- To show a card to a player who did not bring it, translate it into that player's
+  `baseLanguage`:
+
+```ts
+const langs = [...new Set(ctx.players.flatMap((p) => [p.language, p.baseLanguage]))]
+  .filter((lang): lang is string => !!lang && lang !== "en");
+const results = await ctx.translateSenses!(picked.map(senseRequestFor), langs);
+// Prompt for player p: results[i].translations[p.baseLanguage]?.word ?? picked[i].english
+```
+
+A game that changes nothing keeps working: it shows `english` to everyone, as before, and
+a Russian-base player now has cards. A card of a pair without English that the catalog
+has not resolved to a meaning has no `source_lemma` and is still dropped.
+
+In the browser, `translator:init` carries `uiLocale` (interface language) and
+`explanationLang` (the player's base language) for the game's own texts.
 
 ## Card meanings (0.6 types / 0.7 runtime)
 
