@@ -3,6 +3,10 @@
 All notable changes to the shared contracts package are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- `TranslatorInitMessage` gains optional `targetLang`, `uiLocale` and `explanationLang`. The host sends the interface language and the player's base language so a game can localize its own UI. Older hosts omit them.
+
 ## 0.5.0 — 2026-08-14
 
 Card-first audio and imported-card compatibility (Translator-app#271). Additive wire
