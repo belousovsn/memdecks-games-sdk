@@ -18,10 +18,10 @@ export { loadEnv } from "./env";
 export type { RuntimeEnv } from "./env";
 export { createTicketVerifier } from "./auth";
 export type { TicketVerifier } from "./auth";
-export { defaultCardProvider } from "./cards";
+export { defaultCardProvider, normalizeCardRow } from "./cards";
 export type { CardProvider, CardProviderArgs } from "./cards";
-export { defaultTranslateProvider } from "./translate";
-export type { TranslateProvider, TranslateProviderArgs } from "./translate";
+export { defaultTranslateProvider, defaultTranslateSensesProvider, senseRequestFor } from "./translate";
+export type { TranslateProvider, TranslateProviderArgs, TranslateSensesProvider } from "./translate";
 export { createHttpReporter, noopReporter } from "./reporter";
 export type {
   LifecycleReporter,

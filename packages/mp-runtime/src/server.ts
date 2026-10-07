@@ -17,7 +17,12 @@ import {
 import { loadEnv, type RuntimeEnv } from "./env";
 import { createTicketVerifier } from "./auth";
 import { defaultCardProvider, type CardProvider } from "./cards";
-import { defaultTranslateProvider, type TranslateProvider } from "./translate";
+import {
+  defaultTranslateProvider,
+  defaultTranslateSensesProvider,
+  type TranslateProvider,
+  type TranslateSensesProvider,
+} from "./translate";
 import { createHttpReporter, noopReporter, type LifecycleReporter } from "./reporter";
 import { Room } from "./room";
 
@@ -32,6 +37,8 @@ export interface MultiplayerServerOptions {
   cardProvider?: CardProvider;
   /** Custom `ctx.translate` provider; defaults to POST {apiBase}/api/cards/translate. */
   translateProvider?: TranslateProvider;
+  /** Custom `ctx.translateSenses` provider; defaults to the same endpoint with meaning objects. */
+  translateSensesProvider?: TranslateSensesProvider;
   /** Custom lifecycle reporter; defaults to an HTTP push to the platform ledger when
    *  `env.reportLifecycle` is on, else a no-op. Injectable for tests. */
   lifecycleReporter?: LifecycleReporter;
@@ -64,6 +71,7 @@ export function createMultiplayerServer(
   const verify = createTicketVerifier(env);
   const cardProvider = opts.cardProvider ?? defaultCardProvider;
   const translateProvider = opts.translateProvider ?? defaultTranslateProvider;
+  const translateSensesProvider = opts.translateSensesProvider ?? defaultTranslateSensesProvider;
   const reporter =
     opts.lifecycleReporter ??
     (env.reportLifecycle
@@ -116,20 +124,21 @@ export function createMultiplayerServer(
           return;
         }
 
+        const baseLanguage = claims.players.find((player) => player.userId === claims.sub)?.baseLanguage;
         const cards = await cardProvider({
           userId: claims.sub,
           cardToken: claims.cardToken,
           apiBase: env.translatorApiBase,
+          ...(baseLanguage ? { baseLanguage } : {}),
         });
 
         let room = rooms.get(claims.matchId);
         if (!room) {
           // Any rostered player's scoped token can authorize the match's translate calls.
-          const translate = translateProvider({
-            cardToken: claims.cardToken,
-            apiBase: env.translatorApiBase,
-          });
-          room = new Room(io, module, claims, translate, reporter);
+          const translateArgs = { cardToken: claims.cardToken, apiBase: env.translatorApiBase };
+          const translate = translateProvider(translateArgs);
+          const translateSenses = translateSensesProvider(translateArgs);
+          room = new Room(io, module, claims, translate, reporter, translateSenses);
           rooms.set(claims.matchId, room);
         }
 

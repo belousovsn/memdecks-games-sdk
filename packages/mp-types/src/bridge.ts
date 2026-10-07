@@ -45,6 +45,14 @@ export interface TranslatorInitMessage {
   match?: MatchHandoff;
   /** Optional contract-filtered card set (legacy resolver path). */
   cards?: ResolvedCardRef[];
+  /** The player's study-language code, e.g. "hy". */
+  targetLang?: string;
+  /** The host's interface language, e.g. "ru". Show the game's own UI in it when a
+   *  translation exists; fall back to English otherwise. Absent on older hosts. */
+  uiLocale?: string;
+  /** The language the player reads meanings and notes in (their base language).
+   *  Independent of `uiLocale`: English buttons over Russian notes is a valid setup. */
+  explanationLang?: string;
 }
 
 /** Refreshed tokens pushed by the parent while the iframe stays open. */

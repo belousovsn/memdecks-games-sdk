@@ -5,7 +5,7 @@
  * `playerId` throughout is the stable per-match player id (the player's userId),
  * not a socket id — so it survives reconnects.
  */
-import type { Card, CardTranslation } from "./cards";
+import type { Card, CardTranslation, TranslateSenseRequest } from "./cards";
 import type { MatchedPlayer } from "./match";
 
 /** A dropdown setting the platform lobby renders generically. */
@@ -88,6 +88,27 @@ export type TranslateFn = (
   languages: string[],
 ) => Promise<Record<string, Partial<Record<string, CardTranslation | null>>>>;
 
+/** One answer of `ctx.translateSenses`: the request echoed, plus its translations. */
+export interface TranslateSenseResult extends TranslateSenseRequest {
+  /** Per requested language; `null` where the platform has no translation. */
+  translations: Partial<Record<string, CardTranslation | null>>;
+}
+
+/**
+ * Translate specific meanings, not bare words. Use it for cards that carry a `senseKey`:
+ * `ctx.translate("march")` gives the primary meaning, so an opponent would see a card
+ * saved on March the month as the walk. Build requests with `senseRequestFor(card)`
+ * from `@memdecks/mp-runtime`.
+ *
+ * Results come back in request order. A meaning a language lacks degrades to the primary
+ * one, and then `translations[lang].senseKey` differs from the requested key — compare
+ * them if the difference matters to the game.
+ */
+export type TranslateSensesFn = (
+  requests: TranslateSenseRequest[],
+  languages: string[],
+) => Promise<TranslateSenseResult[]>;
+
 /** Inputs handed to `createMatch` when a match (incl. solo) is formed. */
 export interface MatchContext {
   matchId: string;
@@ -99,6 +120,8 @@ export interface MatchContext {
   cards: Record<string, Card[]>;
   /** Platform-backed word translation; absent when the runtime has no provider. */
   translate?: TranslateFn;
+  /** Platform-backed translation of specific meanings; absent when the runtime has no provider. */
+  translateSenses?: TranslateSensesFn;
 }
 
 /**

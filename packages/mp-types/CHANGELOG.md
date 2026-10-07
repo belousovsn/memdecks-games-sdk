@@ -3,6 +3,18 @@
 All notable changes to the shared contracts package are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.7.0 — 2026-10-07
+
+Cards of a pair without English (Translator-app#565). Additive; `PROTOCOL_VERSION`
+remains `1`.
+
+### Added
+- `Card.prompt` and `Card.promptLanguage`: the word the player reads the card by, in their
+  base language. `Card.english` stays the concept key and is now documented as such.
+- `MatchedPlayer.baseLanguage`: the language a player reads prompts in.
+
+- `TranslatorInitMessage` gains optional `targetLang`, `uiLocale` and `explanationLang`. The host sends the interface language and the player's base language so a game can localize its own UI. Older hosts omit them.
+
 ## 0.5.0 — 2026-08-14
 
 Card-first audio and imported-card compatibility (Translator-app#271). Additive wire
