@@ -79,6 +79,7 @@ const { session } = await initGame();
 if (session) {
   const audio = createCardAudio(session);
   await audio.play(card); // Card, resolved card reference, or card id
+  await audio.play({ text: "γάτα", lang: "el" }); // a word the player has no card for
 }
 ```
 
