@@ -3,6 +3,17 @@
 All notable changes to the browser-side helper are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.5.0 — 2026-10-08
+
+### Added
+- `createCardAudio(session)` also takes a word: `audio.play({ text, lang })`. Use it for a
+  word the player holds no card for, such as one drafted from a co-player's deck or one
+  that `ctx.translate` / `ctx.translateSenses` gave the match. The platform answers card
+  audio only to the card's owner, so these words were silent. `WordAudioRef` is exported.
+- A word whose audio is still being synthesized resolves as `unavailable` and is asked
+  again after 30 seconds. A platform without the word-audio route answers 404, which is
+  also `unavailable`.
+
 ## 0.4.0 — 2026-08-14
 
 ### Added

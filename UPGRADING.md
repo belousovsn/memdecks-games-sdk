@@ -8,6 +8,7 @@ mixed versions across the three parties (host, runtime, game) interoperate.
 
 | Package | Version | What's new |
 | --- | --- | --- |
+| `@memdecks/mp-client` | 0.5.0 | `createCardAudio` plays a word by text and language: `audio.play({ text, lang })` |
 | `@memdecks/mp-types` | 0.6.0 | Card meaning: `Card.senseKey/senseGloss/sourceLemma`, `CardTranslation.senseKey/briefGloss`, `ctx.translateSenses` |
 | `@memdecks/mp-runtime` | 0.7.0 | `ctx.translateSenses` provider, `senseRequestFor(card)`; `defaultCardProvider` normalizes `/api/cards` rows |
 | `@memdecks/mp-client` | 0.4.1 | Depends on `mp-types ^0.6.0`; no behavior change |
@@ -24,6 +25,26 @@ mixed versions across the three parties (host, runtime, game) interoperate.
 
 (0.3.x on runtime/types — the `/matches/:id/status` route and the `PROTOCOL_VERSION`
 handshake marker — is folded into these notes.)
+
+## Audio for a word the player has no card for (0.5 client)
+
+In a match one player often sees a word from another player's deck, or a word the platform
+translated for the match. The platform answers card audio only to the card's owner, so
+`audio.play(card)` cannot speak such a word. Ask for it by text and language:
+
+```ts
+const audio = createCardAudio(session);
+// The player's own card: by card, as before.
+await audio.play(card);
+// A word they hold no card for: the study word they see, in their study language.
+await audio.play({ text: "կատու", lang: "hy" });
+```
+
+The server side of the game decides which one applies and sends it in the view: the card id
+when the player owns the card, otherwise the word and its language. `ctx.translate` and
+`ctx.translateSenses` queue speech for the words they return, so the audio is usually ready
+by the time the match shows the word. Until then `play` returns `null`, and the answer is
+asked again after 30 seconds.
 
 ## Players who do not read English (0.7 types / 0.8 runtime)
 

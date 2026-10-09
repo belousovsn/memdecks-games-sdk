@@ -16,7 +16,7 @@ export { joinMatch } from "./match";
 export type { MatchHandlers, MatchConnection } from "./match";
 export { fetchUserCards } from "./cards";
 export { createCardAudio } from "./audio";
-export type { CardAudioClient, CardAudioRef, PlayCardAudioOptions } from "./audio";
+export type { CardAudioClient, CardAudioRef, PlayCardAudioOptions, WordAudioRef } from "./audio";
 
 // Re-export the contracts for convenience.
 export * from "@memdecks/mp-types";
