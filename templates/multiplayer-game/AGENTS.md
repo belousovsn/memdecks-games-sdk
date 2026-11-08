@@ -15,7 +15,8 @@ lobby, matchmaking, auth, and card provisioning. **You implement one file: `src/
 2. Build a client that:
    - calls `initGame()` from `@memdecks/mp-client`, then `joinMatch(session.match!, {...})`,
    - renders `onState` views and calls `conn.sendAction(name, payload)`.
-3. Register the game (id, url) with the platform (`GAME_APPS` + `games.json`).
+3. Host the client and the match server, then ask for the game to be listed (see the root
+   README).
 
 ## Rules
 - `playerId` is the player's **userId**; never trust a client-supplied id, never use an admin key.

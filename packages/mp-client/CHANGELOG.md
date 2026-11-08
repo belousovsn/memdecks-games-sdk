@@ -3,6 +3,17 @@
 All notable changes to the browser-side helper are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.6.0 — 2026-11-08
+
+### Added
+- Demo mode: `initGame({ demo: true })` gives a session with sample cards when no memdecks
+  host answers, so a game can be built and tried outside the site. `fetchUserCards`
+  returns the deck and card audio answers `unavailable`, with no network calls. Pass
+  `{ cards, targetLang, uiLocale }` to change the deck or the player's languages.
+  `DEMO_CARDS` (twelve nouns in `hy`, `gr`, `ru`, `es`) and `DemoOptions` are exported.
+- `GameSession` carries `targetLang`, `uiLocale` and `explanationLang` from
+  `translator:init`. A single-player game had no way to learn the player's study language.
+
 ## 0.5.0 — 2026-10-08
 
 ### Added

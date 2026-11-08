@@ -8,6 +8,7 @@ import type { GameSession } from "./bridge";
 
 /** Fetch the signed-in user's cards from the Translator API using the session's token. */
 export async function fetchUserCards(session: GameSession): Promise<Card[]> {
+  if (session.demo) return session.demo.cards.map((c) => structuredClone(c));
   const token = session.gameToken ?? session.accessToken;
   if (!token) throw new Error("No token in session; cannot fetch cards.");
   const base = session.apiBase.replace(/\/+$/, "");

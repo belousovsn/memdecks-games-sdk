@@ -10,8 +10,8 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@memdecks/mp-runtime": "*",
-    "@memdecks/mp-types": "*"
+    "@memdecks/mp-runtime": "^0.8.0",
+    "@memdecks/mp-types": "^0.7.0"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

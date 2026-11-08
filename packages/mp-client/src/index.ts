@@ -1,8 +1,8 @@
 /**
  * @memdecks/mp-client — browser-side helper for memdecks games.
  *
- * Single-player:
- *   const { session } = await initGame();
+ * Single-player (`demo: true` gives sample cards when run outside the site):
+ *   const { session } = await initGame({ demo: true });
  *   const cards = await fetchUserCards(session!);
  *
  * Multiplayer:
@@ -15,6 +15,8 @@ export type { GameSession, InitOptions, TranslatorBridge } from "./bridge";
 export { joinMatch } from "./match";
 export type { MatchHandlers, MatchConnection } from "./match";
 export { fetchUserCards } from "./cards";
+export { DEMO_CARDS } from "./demo";
+export type { DemoOptions } from "./demo";
 export { createCardAudio } from "./audio";
 export type { CardAudioClient, CardAudioRef, PlayCardAudioOptions, WordAudioRef } from "./audio";
 

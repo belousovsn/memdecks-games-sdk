@@ -8,6 +8,7 @@ mixed versions across the three parties (host, runtime, game) interoperate.
 
 | Package | Version | What's new |
 | --- | --- | --- |
+| `@memdecks/mp-client` | 0.6.0 | Demo mode `initGame({ demo })` with `DEMO_CARDS`; `session.targetLang` / `uiLocale` / `explanationLang` |
 | `@memdecks/mp-client` | 0.5.0 | `createCardAudio` plays a word by text and language: `audio.play({ text, lang })` |
 | `@memdecks/mp-types` | 0.6.0 | Card meaning: `Card.senseKey/senseGloss/sourceLemma`, `CardTranslation.senseKey/briefGloss`, `ctx.translateSenses` |
 | `@memdecks/mp-runtime` | 0.7.0 | `ctx.translateSenses` provider, `senseRequestFor(card)`; `defaultCardProvider` normalizes `/api/cards` rows |
