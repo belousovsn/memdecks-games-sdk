@@ -1,76 +1,101 @@
 # memdecks-games-sdk
 
-SDK and shared contracts for building **single- and multiplayer games** on the memdecks
-platform. Games run in an iframe inside the Translator app, authenticate via a
-postMessage bridge, and (for multiplayer) run their realtime session on an
-`mp-runtime` server — self-hosted by the game's operator.
+Build word games for [memdecks.com](https://memdecks.com), a site where people collect the
+words they know in the language they're learning.
 
-> Architecture rationale lives in the private core repo at
-> `translator/rnd/multiplayer-platform-plan.md`. This repo is the **public** half:
-> the contract + engine + templates external developers depend on.
+Every game on memdecks is a separate web app. You host it wherever you like, and the site
+opens it in an iframe. Your game gets the player's words, translations and audio. The site
+handles accounts, word lists and progress. Multiplayer games also get a lobby,
+matchmaking and players who study different languages in one match.
+
+If your game is fun, we'll add it to the site.
+
+## Make a single-player game in two minutes
+
+```bash
+npx degit belousovsn/memdecks-games-sdk/templates/single-player-game my-game
+cd my-game
+npm install
+npm run dev
+```
+
+Open http://localhost:5173. Outside memdecks there is no player, so the game runs in demo
+mode with twelve sample cards in Armenian, Greek, Russian and Spanish. The template is a
+small working quiz; replace `startGame` in `src/main.ts` with your game. Any framework
+works.
+
+The whole API you need:
+
+```ts
+import { initGame, fetchUserCards, createCardAudio } from "@memdecks/mp-client";
+
+const { session, close } = await initGame({ demo: import.meta.env.DEV });
+const cards = await fetchUserCards(session!);   // the player's words
+const lang = session!.targetLang;               // the language they study, e.g. "hy"
+cards[0].translations[lang!]?.word;             // "կատու"
+await createCardAudio(session!).play(cards[0]); // pronunciation, when the site has it
+close();                                        // back to memdecks
+```
+
+A card has an English word that names the concept, an optional `prompt` in the player's
+own language, and a translation per study language. See `Card` in
+[`@memdecks/mp-types`](packages/mp-types/src/cards.ts).
+
+## Make a multiplayer game
+
+You write the rules as one `GameModule`. The SDK runs the match server, checks who is
+playing, deals the cards and sends every player their own view.
+
+```bash
+npx degit belousovsn/memdecks-games-sdk/templates/multiplayer-game my-mp-game
+cd my-mp-game
+npm install
+npm run build
+MATCH_TICKET_SECRET=dev-secret PORT=4601 npm start
+```
+
+To play a match locally, sign a test ticket with the same secret and pass your own cards
+to the server. [`examples/speed-match/smoke.mjs`](examples/speed-match/smoke.mjs) does
+exactly that in 50 lines, and [`examples/speed-match`](examples/speed-match) is a full
+working game.
+
+Players often study different languages. `ctx.translate` gives you the words a match
+picked in every player's language, so they can still play the same round. See
+[AGENTS.md](AGENTS.md#cross-language-play-ctxtranslate).
+
+## Get your game on memdecks
+
+1. Host the game on HTTPS, at the root of its domain or subdomain.
+2. Check that it works with the demo deck and that `close()` is wired to an exit button.
+3. [Open an issue](https://github.com/belousovsn/memdecks-games-sdk/issues/new?template=add-a-game.md)
+   with the link, a screenshot and a line about how it plays.
+
+We play it, and if it fits, we add it to the site. Single-player games need nothing else.
+For a multiplayer game we agree on where its match server runs and share the ticket key.
 
 ## Packages
 
-| Package | Role | Status |
-|---|---|---|
-| [`@memdecks/mp-types`](packages/mp-types) | Zero-dep contracts: bridge messages, `Card`, `GameModule`, match tickets, gameplay protocol | ✅ implemented |
-| [`@memdecks/mp-runtime`](packages/mp-runtime) | Tier-2 game session engine (Socket.IO, lobby/match lifecycle, ticket verify, per-player views, card provisioning, word translation) | ✅ implemented |
-| [`@memdecks/mp-client`](packages/mp-client) | Game-side helper: bridge receiver + authenticated socket + join-by-ticket + single-player card fetch | ✅ implemented |
-
-## Mental model
-
-- **Platform (memdecks, private):** identity + content API. Issues scoped card tokens
-  and signed match tickets.
-- **Platform Lobby (memdecks, private):** presence, matchmaking, settings, forms matches,
-  hands off via signed ticket.
-- **Game runtime (this SDK):** runs the actual match. Self-hosted by the operator
-  (your VPS, ours, or a first-party hub). Verifies the ticket; never needs to call back
-  to the platform.
-- **A game author writes one thing:** a `GameModule` (rules) + a thin client. Everything
-  else — lobby, transport, auth, cards — comes from the SDK.
-- **Cross-language play:** players study different languages. From an async `createMatch`,
-  call `ctx.translate(words, languages)` to localize the cards a match picked — see
-  [AGENTS.md](AGENTS.md#cross-language-play-ctxtranslate).
-
-See [AGENTS.md](AGENTS.md) for the contract summary aimed at LLM coding agents.
-
-## Reporting to the platform ledger
-
-The platform keeps a server-owned **game session ledger** — the durable record feeding
-learning metrics and analytics.
-
-- **Match lifecycle (launch / result / abandon):** `mp-runtime` ≥ 0.4.0 pushes it
-  automatically, authorized per player by their scoped card token. Best-effort, never
-  affects gameplay; opt out with `MEMDECKS_REPORT_LIFECYCLE=false`. See
-  [UPGRADING.md](UPGRADING.md).
-- **Per-card answers (`card_practiced`) — planned (Translator-app#216):** the platform's
-  recall/retention metrics need per-answer events (`cardId`, `correct`, unique idempotency
-  key per answer). An `mp-runtime` helper is coming; until then a custom runtime can POST
-  the same `/api/games/events` endpoint directly — contract and rules in the private repo's
-  `GAME_INTEGRATION.md` ("Learning events"). Never put card text in the payload.
-
-## Develop
-
-```bash
-npm install
-npm run build      # builds the three packages (dependency-ordered)
-```
-
-## Build a game
-
-| Start from | When |
+| Package | What it is for |
 |---|---|
-| [`templates/single-player-game`](templates/single-player-game) | client-only game (no server) |
-| [`templates/multiplayer-game`](templates/multiplayer-game) | multiplayer (you write one `GameModule`) |
-| [`examples/speed-match`](examples/speed-match) | full working multiplayer reference |
-| [`examples/hub`](examples/hub) | run several first-party games in one process |
+| [`@memdecks/mp-client`](packages/mp-client) | Browser side: connecting to the site, the player's cards, audio, joining a match |
+| [`@memdecks/mp-runtime`](packages/mp-runtime) | Match server for multiplayer games (Socket.IO, lobby handoff, tickets, cards, translation) |
+| [`@memdecks/mp-types`](packages/mp-types) | Shared types: cards, messages, `GameModule`, match tickets |
 
-Agents: see [CLAUDE.md](CLAUDE.md) and each template's `AGENTS.md`.
+All three are on npm under the MIT license.
+
+## Rules every game follows
+
+1. The player is who the site says they are. Never trust a user id sent by a client, and
+   never put an API key in a game.
+2. In multiplayer, the server state is the truth. Clients render the view they get and
+   send actions.
+3. Hide each player's secrets in `viewFor`.
+4. Don't build storage URLs for audio or images yourself. Use `createCardAudio` and the
+   URLs on the card.
 
 ## Play card audio
 
-Use the card-first helper in browser games. It handles imported Anki attachments and
-generated TTS through the same authenticated platform endpoint:
+`createCardAudio` plays imported Anki audio and generated speech through the same call:
 
 ```ts
 import { createCardAudio, initGame } from "@memdecks/mp-client";
@@ -83,23 +108,41 @@ if (session) {
 }
 ```
 
-Do not assemble Supabase bucket URLs in a game. A resolved card always has `cardId`, while
-`wordId` is optional for imports that have not been catalog-matched.
+In demo mode every card is silent.
 
-## Publishing & keeping the contract in sync
+## Building with an AI agent
 
-The integration contract lives in these packages, and **both** external games **and** the
-private memdecks core depend on them — so the contract can't drift.
+[CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md) describe the contract for coding agents,
+and each template has its own `AGENTS.md`.
 
-1. Publish the packages (public npm): `@memdecks/mp-types`, then `@memdecks/mp-runtime`
-   and `@memdecks/mp-client`. (`npm publish -w <pkg>`; they're already
-   `publishConfig.access: public`.)
-2. In the private Translator repo, replace the **inlined** contract copies with the
-   published types and add `@memdecks/mp-types` as a dependency:
-   - `server/src/services/gameTokenService.ts` → `TicketPlayer`/ticket claim shapes.
-   - `lobby/src/types.ts` → `MatchedPlayer`, `MatchHandoff`.
-   - the Translator client's `translator:init` sender → bridge message types.
-3. Games depend on the published packages; the VPS `npm ci` pulls them on deploy.
+## Working on the SDK itself
 
-A contract change is then: edit the package → bump + publish → the core bumps its dep
-(a reviewed step). No private→public file mirroring, so nothing private leaks.
+```bash
+npm install
+npm run build      # builds the three packages in dependency order
+node smoke.mjs     # runtime smoke test
+node examples/speed-match/smoke.mjs
+```
+
+Release notes are in [UPGRADING.md](UPGRADING.md) and each package's `CHANGELOG.md`.
+
+### Publishing
+
+Both the games and the memdecks site depend on these packages, so the contract can't
+drift between them.
+
+1. Bump versions and note the change in `UPGRADING.md`.
+2. Publish in order: `@memdecks/mp-types`, then `@memdecks/mp-runtime` and
+   `@memdecks/mp-client` (`npm publish -w <pkg>`).
+3. The site and the games then raise their dependency in a reviewed change.
+
+### Reporting to the platform
+
+`mp-runtime` 0.4.0 and later report each match's launch, result and abandonment to the
+platform, authorized per player by their card token. It never affects gameplay; turn it
+off with `MEMDECKS_REPORT_LIFECYCLE=false`. Per-answer events (`card_practiced`) for
+learning statistics are planned as a runtime helper.
+
+## License
+
+[MIT](LICENSE)

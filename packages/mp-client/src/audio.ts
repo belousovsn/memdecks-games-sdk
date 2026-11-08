@@ -88,6 +88,8 @@ export function createCardAudio(session: GameSession): CardAudioClient {
 
   const resolve = async (card: CardAudioRef): Promise<CardAudioResponse> => {
     const { key, path, word } = locate(card);
+    // Demo mode has no platform to ask, so every card and word is silent.
+    if (session.demo) return { status: "unavailable" };
 
     const cached = cache.get(key);
     if (cached && cached.staleAt > Date.now()) return cached.response;

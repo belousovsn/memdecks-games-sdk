@@ -7,12 +7,14 @@
  */
 import {
   PROTOCOL_VERSION,
+  type Card,
   type GameResult,
   type MatchHandoff,
   type ResolvedCardRef,
   type TranslatorInitMessage,
   type TranslatorTokenRefreshMessage,
 } from "@memdecks/mp-types";
+import { DEMO_CARDS, type DemoOptions } from "./demo";
 
 /** Resolved identity + handoff the host handed down. */
 export interface GameSession {
@@ -28,9 +30,23 @@ export interface GameSession {
   match?: MatchHandoff;
   /** Optional contract-filtered card set (legacy resolver path). */
   cards?: ResolvedCardRef[];
+  /** The player's study language, e.g. "hy". */
+  targetLang?: string;
+  /** The host's interface language, e.g. "ru". */
+  uiLocale?: string;
+  /** The language the player reads meanings and notes in. */
+  explanationLang?: string;
+  /** Set when the game runs outside the site with `initGame({ demo })`. */
+  demo?: { cards: Card[] };
 }
 
 export interface InitOptions {
+  /**
+   * Run with a sample deck when no host answers, so the game can be built and tried
+   * outside the memdecks site. `true` uses `DEMO_CARDS`; pass options to change the deck
+   * or the player's languages. Ignored inside the site.
+   */
+  demo?: boolean | DemoOptions;
   /** Override how long to wait for `translator:init` before resolving `null`. */
   timeoutMs?: number;
   /** Called whenever the host pushes refreshed tokens. */
@@ -61,7 +77,23 @@ function toSession(init: TranslatorInitMessage): GameSession {
   if (init.supabaseKey !== undefined) s.supabaseKey = init.supabaseKey;
   if (init.match !== undefined) s.match = init.match;
   if (init.cards !== undefined) s.cards = init.cards;
+  if (init.targetLang !== undefined) s.targetLang = init.targetLang;
+  if (init.uiLocale !== undefined) s.uiLocale = init.uiLocale;
+  if (init.explanationLang !== undefined) s.explanationLang = init.explanationLang;
   return s;
+}
+
+function demoSession(demo: true | DemoOptions): GameSession {
+  const options = demo === true ? {} : demo;
+  const cards = (options.cards ?? DEMO_CARDS).map((c) => structuredClone(c));
+  return {
+    apiBase: "demo:",
+    userId: "demo-player",
+    targetLang: options.targetLang ?? "hy",
+    uiLocale: options.uiLocale ?? "en",
+    explanationLang: options.uiLocale ?? "en",
+    demo: { cards },
+  };
 }
 
 export async function initGame(options: InitOptions = {}): Promise<TranslatorBridge> {
@@ -128,6 +160,10 @@ export async function initGame(options: InitOptions = {}): Promise<TranslatorBri
   }, timeoutMs);
 
   session = await sessionReady;
+  if (!session && options.demo) {
+    session = demoSession(options.demo);
+    console.info("[mp-client] no memdecks host answered, running in demo mode with sample cards");
+  }
 
   return {
     session,

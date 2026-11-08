@@ -4,14 +4,17 @@
   "private": true,
   "description": "Starter template for a memdecks single-player game (client-only, no server).",
   "license": "MIT",
-  "main": "dist/main.js",
+  "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@memdecks/mp-client": "*"
+    "@memdecks/mp-client": "^0.6.0"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vite": "^5.1.0"
   }
 }

@@ -5,7 +5,8 @@ platform. If you're an agent asked to build a game, start here.
 
 ## Pick a path
 - **Single-player** (no server): copy `templates/single-player-game/`. You only write a
-  client that calls `initGame()` + `fetchUserCards()`. Guide: that folder's `AGENTS.md`.
+  client that calls `initGame()` + `fetchUserCards()`; `npm run dev` runs it on sample
+  cards. Guide: that folder's `AGENTS.md`.
 - **Multiplayer**: copy `templates/multiplayer-game/`. You write one `GameModule`
   (`src/module.ts`); the SDK does transport/lobby/auth/cards. Guide: that folder's
   `AGENTS.md`. Full reference: `examples/speed-match/`.
@@ -13,7 +14,7 @@ platform. If you're an agent asked to build a game, start here.
 ## Packages (what you import)
 - `@memdecks/mp-types` — contracts (`Card`, `GameModule`, `MatchHandoff`, `MP_EVENTS`, …).
 - `@memdecks/mp-runtime` — `createMultiplayerServer({ game })` (or `{ games: [...] }` for a hub).
-- `@memdecks/mp-client` — `initGame`, `joinMatch`, `fetchUserCards`.
+- `@memdecks/mp-client` — `initGame`, `joinMatch`, `fetchUserCards`, `createCardAudio`, `DEMO_CARDS`.
 
 ## The model in one breath
 A game is an iframe in the Translator host. It gets identity + cards via a postMessage
@@ -39,6 +40,6 @@ npm run build          # builds the three packages (dependency-ordered)
 - Build must pass.
 - Multiplayer: run with `MATCH_TICKET_SECRET=dev npm start` and drive it with a
   self-signed ticket — copy `examples/speed-match/smoke.mjs`.
-- Single-player: build and load in the host (or run standalone for the "no session" path).
+- Single-player: `npm run dev` plays with the demo deck (`initGame({ demo: true })`).
 
 More detail for game authors is in [AGENTS.md](AGENTS.md).
